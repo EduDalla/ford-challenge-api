@@ -1,0 +1,22 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: pulso-retencao-mysql
+    environment:
+      MYSQL_DATABASE: pulso_retencao
+      MYSQL_USER: pulso
+      MYSQL_PASSWORD: pulso123
+      MYSQL_ROOT_PASSWORD: root123
+      TZ: America/Sao_Paulo
+    ports:
+      - "3307:3306"
+    volumes:
+      - pulso-mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot123"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pulso-mysql-data:
