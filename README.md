@@ -326,3 +326,86 @@ curl -X POST http://localhost:8080/api/v1/clientes \
 - **Tratamento de erros**: exceções customizadas e handler global.
 - **Banco de dados**: MySQL com Spring Data JPA e Hibernate.
 - **Migrations**: Flyway cria tabelas e insere dados iniciais.
+
+## 19. Integracao ML BFF para a demo
+
+Fluxo integrado:
+
+```text
+Mobile React Native/Expo ou Swagger Java
+-> Java/Spring Boot BFF
+-> FastAPI ML no Render
+-> modelos joblib externos validados por SHA256
+-> resposta ML convertida em missao/risco/acao recomendada
+```
+
+Endpoint:
+
+```text
+POST /api/ml/predict
+```
+
+Configuracao:
+
+```properties
+FORD_ML_BASE_URL=https://ford-vinguard-api.onrender.com
+FORD_ML_SERVICE_TOKEN=<token JWT analyst gerado pela FastAPI>
+FORD_ML_TIMEOUT_MS=8000
+```
+
+Para testar via Swagger Java sem gravar token em `.env`, informe o JWT no
+header `X-ML-Demo-Token`. Esse header so e usado quando
+`FORD_ML_SERVICE_TOKEN` nao estiver configurado.
+
+Antes, gere um token na FastAPI:
+
+```bash
+curl -X POST "https://ford-vinguard-api.onrender.com/auth/demo-token?role=analyst" \
+  -H "X-Demo-Token-Secret: <DEMO_TOKEN_SECRET>"
+```
+
+Depois chame o BFF Java:
+
+```bash
+curl -X POST http://localhost:8080/api/ml/predict \
+  -H "Content-Type: application/json" \
+  -H "X-ML-Demo-Token: <access_token>" \
+  -d '{
+    "features": {
+      "ano_modelo": 2020,
+      "qtde_revisoes_ate_corte": 2,
+      "meses_desde_ultimo_servico_ate_corte": 14.2,
+      "meses_relacionamento_ate_corte": 48.0,
+      "n_dealers_usados_ate_corte": 1,
+      "km_max_ate_corte": 48200,
+      "pct_agenda_ate_corte": 0.65,
+      "intervalo_medio_revisoes_dias_ate_corte": 220.0,
+      "dias_ate_primeira_revisao": 180,
+      "idade_veiculo_meses_ate_corte": 54.0,
+      "modelo": "KA"
+    },
+    "modelo_veiculo": "Ka"
+  }'
+```
+
+Resposta esperada em forma:
+
+```json
+{
+  "ml": {
+    "prediction": "churn",
+    "churn_probability": 0.73,
+    "risk_level": "high",
+    "perfil_previsto": "inativo",
+    "acao_recomendada": "Ativar recuperacao imediata..."
+  },
+  "missao": {
+    "codigoCartao": "CARD-ML-DEMO",
+    "risco": "alto",
+    "score": 73,
+    "prioridadeRadar": "P1",
+    "perfil": "Cliente inativo",
+    "acaoRecomendada": "Ativar recuperacao imediata..."
+  }
+}
+```
