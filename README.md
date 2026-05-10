@@ -53,6 +53,7 @@ src/main/resources
 - Spring Data JPA
 - Bean Validation
 - MySQL Connector/J
+- PostgreSQL JDBC Driver para profile `prod` com Supabase
 - Flyway
 - Springdoc OpenAPI/Swagger UI
 - Maven
@@ -409,3 +410,41 @@ Resposta esperada em forma:
   }
 }
 ```
+
+## 20. Supabase Postgres em producao
+
+O profile local continua usando a configuracao padrao do projeto. Os testes
+continuam usando H2 por `src/test/resources/application-test.properties`.
+
+PostgreSQL deve ser usado somente com o profile `prod`:
+
+```bash
+SPRING_PROFILES_ACTIVE=prod
+```
+
+No Render, configure as variaveis de ambiente abaixo com os dados do projeto
+Supabase. Nao grave esses valores no repositorio:
+
+```text
+SPRING_PROFILES_ACTIVE=prod
+SPRING_DATASOURCE_URL=jdbc:postgresql://<host>:5432/<database>?sslmode=require
+SPRING_DATASOURCE_USERNAME=<usuario>
+SPRING_DATASOURCE_PASSWORD=<senha>
+```
+
+Notas para Supabase:
+
+- Use a connection string JDBC do Postgres/Supabase com `sslmode=require`.
+- O schema esperado e `public`.
+- As migrations PostgreSQL ficam em `src/main/resources/db/migration-postgres`.
+- O profile `prod` usa `spring.flyway.locations=classpath:db/migration-postgres`.
+- O Hibernate fica em `validate`; quem cria as tabelas em producao e o Flyway.
+- O driver PostgreSQL e o modulo Flyway PostgreSQL ficam no `pom.xml`.
+
+Checklist de deploy no Render:
+
+1. Criar o banco no Supabase e copiar host, database, usuario e senha.
+2. Configurar `SPRING_PROFILES_ACTIVE=prod`.
+3. Configurar `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME` e `SPRING_DATASOURCE_PASSWORD`.
+4. Manter `FORD_ML_BASE_URL` e `FORD_ML_SERVICE_TOKEN` se o BFF Java for chamar a FastAPI ML.
+5. Subir o backend; o Flyway aplicara `V1__create_tables.sql` e `V2__insert_initial_data.sql` no Postgres.
