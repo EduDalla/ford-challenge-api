@@ -430,6 +430,9 @@ SPRING_PROFILES_ACTIVE=prod
 SPRING_DATASOURCE_URL=jdbc:postgresql://<host>:5432/<database>?sslmode=require
 SPRING_DATASOURCE_USERNAME=<usuario>
 SPRING_DATASOURCE_PASSWORD=<senha>
+FORD_ML_BASE_URL=https://ford-vinguard-api.onrender.com
+FORD_ML_SERVICE_TOKEN=<token JWT analyst gerado pela FastAPI>
+CORS_ALLOWED_ORIGINS=*
 ```
 
 Notas para Supabase:
@@ -447,4 +450,51 @@ Checklist de deploy no Render:
 2. Configurar `SPRING_PROFILES_ACTIVE=prod`.
 3. Configurar `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME` e `SPRING_DATASOURCE_PASSWORD`.
 4. Manter `FORD_ML_BASE_URL` e `FORD_ML_SERVICE_TOKEN` se o BFF Java for chamar a FastAPI ML.
-5. Subir o backend; o Flyway aplicara `V1__create_tables.sql` e `V2__insert_initial_data.sql` no Postgres.
+5. Configurar `CORS_ALLOWED_ORIGINS` com `*` para demo ou com a origem real do mobile/web.
+6. Subir o backend; o Flyway aplicara `V1__create_tables.sql` e `V2__insert_initial_data.sql` no Postgres.
+
+## 21. Deploy Docker no Render
+
+Este backend Java deve ser criado no Render como Web Service com Docker, nao
+como Node. Como o projeto esta em monorepo, configure o Root Directory para que
+o Render rode o build dentro da pasta do backend.
+
+Campos principais:
+
+```text
+Name: ford-challenge-api
+Language: Docker
+Branch: main
+Region: Oregon (US West)
+Root Directory: ford-challenge-api
+Dockerfile Path: Dockerfile
+```
+
+Com Docker, nao preencha `Build Command` nem `Start Command` se o Render usar o
+`CMD` do `Dockerfile`. O container executa:
+
+```text
+java -jar /app/app.jar
+```
+
+O `server.port` respeita a variavel `PORT` enviada pela plataforma:
+
+```properties
+server.port=${PORT:8080}
+```
+
+Variaveis de ambiente recomendadas para a demo integrada:
+
+```env
+SPRING_PROFILES_ACTIVE=prod
+SPRING_DATASOURCE_URL=jdbc:postgresql://HOST_POOLER:5432/postgres
+SPRING_DATASOURCE_USERNAME=postgres.xxxxx
+SPRING_DATASOURCE_PASSWORD=SENHA_SUPABASE
+FORD_ML_BASE_URL=https://ford-vinguard-api.onrender.com
+FORD_ML_SERVICE_TOKEN=TOKEN_GERADO_NA_FASTAPI
+CORS_ALLOWED_ORIGINS=*
+```
+
+`FORD_ML_BASE_URL` e o nome principal usado pelo codigo. `ML_API_BASE_URL`
+tambem e aceito como fallback para evitar falha caso a variavel antiga tenha
+sido configurada no painel.
