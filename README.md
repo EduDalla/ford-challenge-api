@@ -30,14 +30,31 @@ Cliente/Postman/Swagger
 
 ```text
 src/main/java/br/com/fiap/ford/pulsoretencao
+├── autenticacao
+│   ├── api
+│   ├── domain
+│   ├── repository
+│   └── service
 ├── cliente
-│   └── api
+│   ├── api
+│   ├── domain
+│   ├── repository
+│   └── service
+├── integracao
+│   ├── domain
+│   ├── repository
+│   └── service
 ├── interacao
-│   └── api
+│   ├── api
+│   ├── domain
+│   ├── repository
+│   └── service
 ├── ml
-│   └── api
+│   ├── api
+│   └── service
 ├── usuario
-│   └── api
+│   ├── domain
+│   └── repository
 ├── infra
 │   ├── config
 │   └── security
@@ -53,10 +70,11 @@ src/main/resources
     └── migration-postgres
 ```
 
-Cada domínio concentra entity, repository e service no próprio pacote. A subpasta
-`api` concentra controllers e DTOs/records expostos via HTTP. Configurações e
-segurança ficam em `infra`, enquanto erros e contratos compartilhados ficam em
-`shared`.
+Os módulos seguem o padrão `api`, `domain`, `repository` e `service` quando
+essas camadas existem. `usuario` guarda a identidade humana, `autenticacao`
+guarda login e estado de autenticação, e `integracao` guarda clientes técnicos e
+permissões de sistema-sistema. Configurações e segurança ficam em `infra`,
+enquanto erros e contratos compartilhados ficam em `shared`.
 
 ## 5. Dependências do projeto
 
@@ -425,7 +443,7 @@ curl -X POST http://localhost:8080/api/v1/clientes \
 - **Métodos HTTP**: uso de GET, POST, PUT e DELETE com status 200, 201, 204, 400, 404 e 500.
 - **Documentação da API**: README e Swagger/OpenAPI.
 - **SOA**: services independentes para clientes e interações.
-- **Separação de responsabilidades**: módulos por domínio com subpacotes `api`, infraestrutura separada e erros compartilhados.
+- **Separação de responsabilidades**: módulos por domínio com subpacotes `api`, `domain`, `repository` e `service` quando aplicável.
 - **Boas práticas REST**: JSON, endpoints no plural e versionamento `/api/v1`.
 - **Tratamento de erros**: exceções customizadas e handler global.
 - **Banco de dados**: MySQL com Spring Data JPA e Hibernate.

@@ -2,7 +2,7 @@ package br.com.fiap.ford.pulsoretencao.ml.api;
 
 import br.com.fiap.ford.pulsoretencao.ml.api.MlBffPredictResponse;
 import br.com.fiap.ford.pulsoretencao.ml.api.MlPredictRequest;
-import br.com.fiap.ford.pulsoretencao.ml.MlPredictionService;
+import br.com.fiap.ford.pulsoretencao.ml.service.MlPredictionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;

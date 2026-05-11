@@ -1,6 +1,6 @@
 package br.com.fiap.ford.pulsoretencao.cliente.api;
 
-import br.com.fiap.ford.pulsoretencao.cliente.NivelRisco;
+import br.com.fiap.ford.pulsoretencao.cliente.domain.NivelRisco;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;

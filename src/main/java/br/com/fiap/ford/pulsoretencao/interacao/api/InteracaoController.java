@@ -2,7 +2,7 @@ package br.com.fiap.ford.pulsoretencao.interacao.api;
 
 import br.com.fiap.ford.pulsoretencao.interacao.api.InteracaoRequest;
 import br.com.fiap.ford.pulsoretencao.interacao.api.InteracaoResponse;
-import br.com.fiap.ford.pulsoretencao.interacao.InteracaoService;
+import br.com.fiap.ford.pulsoretencao.interacao.service.InteracaoService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;

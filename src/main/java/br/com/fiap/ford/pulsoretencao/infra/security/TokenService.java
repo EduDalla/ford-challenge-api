@@ -1,16 +1,16 @@
 package br.com.fiap.ford.pulsoretencao.infra.security;
 
-import br.com.fiap.ford.pulsoretencao.usuario.ApiClient;
-import br.com.fiap.ford.pulsoretencao.usuario.ApiClientPermission;
+import br.com.fiap.ford.pulsoretencao.integracao.domain.ApiClient;
+import br.com.fiap.ford.pulsoretencao.integracao.domain.ApiClientPermission;
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.algorithms.Algorithm;
 import com.auth0.jwt.exceptions.JWTCreationException;
-import br.com.fiap.ford.pulsoretencao.usuario.Usuario;
+import br.com.fiap.ford.pulsoretencao.usuario.domain.Usuario;
 import com.auth0.jwt.exceptions.JWTVerificationException;
 import com.auth0.jwt.interfaces.DecodedJWT;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import br.com.fiap.ford.pulsoretencao.usuario.api.DadosTokenJWT;
+import br.com.fiap.ford.pulsoretencao.autenticacao.api.DadosTokenJWT;
 
 import java.time.Instant;
 import java.time.LocalDateTime;

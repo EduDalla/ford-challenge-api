@@ -1,6 +1,6 @@
 package br.com.fiap.ford.pulsoretencao.interacao.api;
 
-import br.com.fiap.ford.pulsoretencao.interacao.TipoInteracao;
+import br.com.fiap.ford.pulsoretencao.interacao.domain.TipoInteracao;
 
 import java.time.LocalDateTime;
 
