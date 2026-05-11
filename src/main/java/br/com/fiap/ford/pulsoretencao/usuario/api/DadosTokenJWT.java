@@ -1,4 +1,10 @@
 package br.com.fiap.ford.pulsoretencao.usuario.api;
 
-public record DadosTokenJWT(String token) {
+import java.time.Instant;
+
+public record DadosTokenJWT(
+		String token,
+		String tipo,
+		Instant expiraEm
+) {
 }

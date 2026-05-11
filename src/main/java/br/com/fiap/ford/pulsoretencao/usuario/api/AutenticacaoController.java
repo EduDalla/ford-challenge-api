@@ -38,8 +38,8 @@ public class AutenticacaoController {
             var authentication = manager.authenticate(authenticationToken);
             autenticacaoService.registrarLoginComSucesso(dados.login());
 
-            var tokenJWT = tokenService.gerarToken((Usuario) authentication.getPrincipal());
-            return ResponseEntity.ok(new DadosTokenJWT(tokenJWT));
+            DadosTokenJWT tokenJWT = tokenService.gerarToken((Usuario) authentication.getPrincipal());
+            return ResponseEntity.ok(tokenJWT);
         } catch (AuthenticationException exception) {
             autenticacaoService.registrarFalhaLogin(dados.login());
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
