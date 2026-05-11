@@ -132,14 +132,47 @@ Representa uma ação de retenção vinculada a um cliente:
 Representa o usuário autenticável da API:
 
 - `id`
+- `nome`
+- `email`
 - `login`
-- `senha`
+- `senhaHash`
+- `perfil`: `ADMIN`, `ANALISTA`, `GESTOR`
+- `ativo`
+- `criadoEm`
+- `atualizadoEm`
+
+### UsuarioAutenticacao
+
+Representa o estado mutável da autenticação de um usuário:
+
+- `id`
+- `usuario`
+- `tentativasLogin`
+- `bloqueadoAte`
+- `senhaAlteradaEm`
+- `ultimoLoginEm`
+
+### ApiClient
+
+Representa uma credencial técnica para integrações sistema-sistema:
+
+- `id`
+- `nome`
+- `clientId`
+- `clientSecretHash`
+- `ativo`
+- `criadoEm`
+- `atualizadoEm`
+- `ultimoUsoEm`
+- permissões vinculadas por `api_client_permissions`
 
 ## 8. Repositories
 
 - `ClienteRepository`: CRUD de clientes e consultas de duplicidade por email/documento.
 - `InteracaoRepository`: CRUD de interações, listagem por cliente e contagem por cliente.
 - `UsuarioRepository`: consulta usuários por login para autenticação.
+- `UsuarioAutenticacaoRepository`: controla tentativas, bloqueio e último login.
+- `ApiClientRepository`, `PermissionRepository` e `ApiClientPermissionRepository`: controlam clientes técnicos e permissões.
 
 ## 9. Services
 
@@ -147,6 +180,8 @@ Representa o usuário autenticável da API:
 - `InteracaoService`: registro, listagem, busca, exclusão e validação de data futura.
 - `MlPredictionService`: integração com a FastAPI ML.
 - `AutenticacaoService`: integração do usuário com Spring Security.
+- `UsuarioAutenticacaoService`: registra sucesso/falha de login e bloqueio.
+- `ApiClientService`: valida `clientId/clientSecret` de integrações técnicas.
 
 As regras de negócio ficam nos services, não nos controllers.
 
@@ -156,6 +191,7 @@ As regras de negócio ficam nos services, não nos controllers.
 - `InteracaoController`: endpoints de `/api/v1/clientes/{clienteId}/interacoes` e `/api/v1/interacoes/{id}`.
 - `MlPredictionController`: endpoint de `/api/ml/predict`.
 - `AutenticacaoController`: endpoint de `/login`.
+- `ServicoAutenticacaoController`: endpoint de `/api/v1/auth/service-token`.
 
 ## 11. DTOs
 
@@ -164,7 +200,7 @@ As regras de negócio ficam nos services, não nos controllers.
 - `InteracaoRequest`: dados recebidos para registrar interação.
 - `InteracaoResponse`: dados devolvidos sobre uma interação.
 - `MlPredictRequest`, `MlFeaturesRequest`, `MlPredictResponse`, `MlBffPredictResponse` e `MlMissaoResponse`: contratos da integração ML.
-- `DadosAutenticacao` e `DadosTokenJWT`: contratos de autenticação.
+- `DadosAutenticacao`, `DadosAutenticacaoServico` e `DadosTokenJWT`: contratos de autenticação.
 - `ErrorResponse`: formato padronizado de erro.
 
 ## 12. Tratamento de exceções
@@ -197,7 +233,7 @@ As migrations ficam em `src/main/resources/db/migration`.
 
 - `V1__create_tables.sql`: cria `clientes` e `interacoes`.
 - `V2__insert_initial_data.sql`: insere dados iniciais.
-- `V3__create_usuarios_table.sql`: cria `usuarios`.
+- `V3__create_usuarios_table.sql`: cria `usuarios`, `usuario_autenticacao`, `api_clients`, `permissions` e `api_client_permissions`.
 
 Para PostgreSQL, o profile de produção usa scripts equivalentes em
 `src/main/resources/db/migration-postgres`. O Hibernate está em modo `validate`,
@@ -216,6 +252,31 @@ OpenAPI JSON:
 ```text
 http://localhost:8080/v3/api-docs
 ```
+
+### Autenticação
+
+| Método | Endpoint | Descrição | Status |
+| --- | --- | --- | --- |
+| POST | `/login` | Gera JWT para usuário humano | 200 ou 401 |
+| POST | `/api/v1/auth/service-token` | Gera JWT para cliente técnico | 200 ou 401 |
+
+Tokens de usuário carregam `type=user` e `role`. Tokens de serviço carregam
+`type=service` e `scopes`. O endpoint `/api/ml/predict` exige token de serviço
+com o scope `ml:predict`.
+
+Exemplo de token técnico:
+
+```bash
+curl -X POST http://localhost:8080/api/v1/auth/service-token \
+  -H "Content-Type: application/json" \
+  -d '{
+    "clientId": "python-ml-service",
+    "clientSecret": "<segredo_do_cliente>"
+  }'
+```
+
+O valor salvo em `api_clients.client_secret_hash` deve ser um hash BCrypt, não o
+segredo em texto puro.
 
 ### Clientes
 
@@ -394,11 +455,16 @@ Configuracao:
 FORD_ML_BASE_URL=https://ford-vinguard-api.onrender.com
 FORD_ML_SERVICE_TOKEN=<token JWT analyst gerado pela FastAPI>
 FORD_ML_TIMEOUT_MS=8000
+JWT_SECRET=<segredo usado para assinar tokens do Java>
 ```
 
-Para testar via Swagger Java sem gravar token em `.env`, informe o JWT no
-header `X-ML-Demo-Token`. Esse header so e usado quando
+Para testar via Swagger Java sem gravar o token da FastAPI em `.env`, informe o
+JWT da FastAPI no header `X-ML-Demo-Token`. Esse header so e usado quando
 `FORD_ML_SERVICE_TOKEN` nao estiver configurado.
+
+Além disso, para chamar `/api/ml/predict`, informe no header `Authorization` um
+Bearer token emitido por `/api/v1/auth/service-token` para um `api_client` com a
+permissao `ml:predict`.
 
 Antes, gere um token na FastAPI:
 
@@ -412,6 +478,7 @@ Depois chame o BFF Java:
 ```bash
 curl -X POST http://localhost:8080/api/ml/predict \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <service_token_java>" \
   -H "X-ML-Demo-Token: <access_token>" \
   -d '{
     "features": {
