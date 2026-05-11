@@ -30,20 +30,33 @@ Cliente/Postman/Swagger
 
 ```text
 src/main/java/br/com/fiap/ford/pulsoretencao
-├── config
-├── controller
-├── dto
-├── exception
-├── model
-├── repository
-└── service
+├── cliente
+│   └── api
+├── interacao
+│   └── api
+├── ml
+│   └── api
+├── usuario
+│   └── api
+├── infra
+│   ├── config
+│   └── security
+└── shared
+    ├── api
+    └── exception
 
 src/main/resources
 ├── application.properties
-└── db/migration
-    ├── V1__create_tables.sql
-    └── V2__insert_initial_data.sql
+├── application-prod.properties
+└── db
+    ├── migration
+    └── migration-postgres
 ```
+
+Cada domínio concentra entity, repository e service no próprio pacote. A subpasta
+`api` concentra controllers e DTOs/records expostos via HTTP. Configurações e
+segurança ficam em `infra`, enquanto erros e contratos compartilhados ficam em
+`shared`.
 
 ## 5. Dependências do projeto
 
@@ -51,12 +64,14 @@ src/main/resources
 - Spring Boot 4.0.6
 - Spring Web MVC
 - Spring Data JPA
+- Spring Security
 - Bean Validation
 - MySQL Connector/J
 - PostgreSQL JDBC Driver para profile `prod` com Supabase
 - Flyway
 - Springdoc OpenAPI/Swagger UI
-- Maven
+- Auth0 Java JWT
+- Maven Wrapper (`./mvnw`)
 - H2 apenas para testes automatizados
 
 ## 6. Configuração do banco de dados
@@ -112,15 +127,26 @@ Representa uma ação de retenção vinculada a um cliente:
 - `resultado`
 - `dataInteracao`
 
+### Usuario
+
+Representa o usuário autenticável da API:
+
+- `id`
+- `login`
+- `senha`
+
 ## 8. Repositories
 
 - `ClienteRepository`: CRUD de clientes e consultas de duplicidade por email/documento.
 - `InteracaoRepository`: CRUD de interações, listagem por cliente e contagem por cliente.
+- `UsuarioRepository`: consulta usuários por login para autenticação.
 
 ## 9. Services
 
 - `ClienteService`: cadastro, listagem, busca, atualização, exclusão e validação de duplicidade.
 - `InteracaoService`: registro, listagem, busca, exclusão e validação de data futura.
+- `MlPredictionService`: integração com a FastAPI ML.
+- `AutenticacaoService`: integração do usuário com Spring Security.
 
 As regras de negócio ficam nos services, não nos controllers.
 
@@ -128,6 +154,8 @@ As regras de negócio ficam nos services, não nos controllers.
 
 - `ClienteController`: endpoints de `/api/v1/clientes`.
 - `InteracaoController`: endpoints de `/api/v1/clientes/{clienteId}/interacoes` e `/api/v1/interacoes/{id}`.
+- `MlPredictionController`: endpoint de `/api/ml/predict`.
+- `AutenticacaoController`: endpoint de `/login`.
 
 ## 11. DTOs
 
@@ -135,6 +163,8 @@ As regras de negócio ficam nos services, não nos controllers.
 - `ClienteResponse`: dados devolvidos ao cliente da API.
 - `InteracaoRequest`: dados recebidos para registrar interação.
 - `InteracaoResponse`: dados devolvidos sobre uma interação.
+- `MlPredictRequest`, `MlFeaturesRequest`, `MlPredictResponse`, `MlBffPredictResponse` e `MlMissaoResponse`: contratos da integração ML.
+- `DadosAutenticacao` e `DadosTokenJWT`: contratos de autenticação.
 - `ErrorResponse`: formato padronizado de erro.
 
 ## 12. Tratamento de exceções
@@ -167,8 +197,11 @@ As migrations ficam em `src/main/resources/db/migration`.
 
 - `V1__create_tables.sql`: cria `clientes` e `interacoes`.
 - `V2__insert_initial_data.sql`: insere dados iniciais.
+- `V3__create_usuarios_table.sql`: cria `usuarios`.
 
-O Hibernate está em modo `validate`, então quem cria a estrutura é o Flyway.
+Para PostgreSQL, o profile de produção usa scripts equivalentes em
+`src/main/resources/db/migration-postgres`. O Hibernate está em modo `validate`,
+então quem cria a estrutura é o Flyway.
 
 ## 14. Documentação dos endpoints
 
@@ -273,6 +306,14 @@ Pré-requisitos:
 - JDK 17 ou superior
 - Docker, se quiser usar o MySQL do `docker-compose.yml`
 
+Se o JDK não estiver no ambiente, configure `JAVA_HOME` antes de usar o Maven
+Wrapper:
+
+```bash
+export JAVA_HOME=/caminho/para/jdk-17
+export PATH="$JAVA_HOME/bin:$PATH"
+```
+
 Passos:
 
 ```bash
@@ -291,6 +332,7 @@ http://localhost:8080/swagger-ui.html
 Testes automatizados:
 
 ```bash
+./mvnw -DskipTests compile
 ./mvnw test
 ```
 
@@ -322,11 +364,11 @@ curl -X POST http://localhost:8080/api/v1/clientes \
 - **Métodos HTTP**: uso de GET, POST, PUT e DELETE com status 200, 201, 204, 400, 404 e 500.
 - **Documentação da API**: README e Swagger/OpenAPI.
 - **SOA**: services independentes para clientes e interações.
-- **Separação de responsabilidades**: controller, service, repository, model, dto e exception.
+- **Separação de responsabilidades**: módulos por domínio com subpacotes `api`, infraestrutura separada e erros compartilhados.
 - **Boas práticas REST**: JSON, endpoints no plural e versionamento `/api/v1`.
 - **Tratamento de erros**: exceções customizadas e handler global.
 - **Banco de dados**: MySQL com Spring Data JPA e Hibernate.
-- **Migrations**: Flyway cria tabelas e insere dados iniciais.
+- **Migrations**: Flyway cria tabelas, usuários e dados iniciais.
 
 ## 19. Integracao ML BFF para a demo
 
