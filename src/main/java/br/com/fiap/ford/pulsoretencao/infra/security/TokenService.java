@@ -2,6 +2,7 @@ package br.com.fiap.ford.pulsoretencao.infra.security;
 
 import br.com.fiap.ford.pulsoretencao.integracao.domain.ApiClient;
 import br.com.fiap.ford.pulsoretencao.integracao.domain.ApiClientPermission;
+import br.com.fiap.ford.pulsoretencao.integracao.domain.Permission;
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.algorithms.Algorithm;
 import com.auth0.jwt.exceptions.JWTCreationException;
@@ -49,7 +50,7 @@ public class TokenService {
                 .stream()
                 .map(ApiClientPermission::getPermission)
                 .filter(permission -> Boolean.TRUE.equals(permission.getAtivo()))
-                .map(permission -> permission.getCodigo())
+                .map(Permission::getCodigo)
                 .toList();
 
         try {

@@ -111,11 +111,29 @@ DB_USERNAME=pulso
 DB_PASSWORD=pulso123
 ```
 
-Para subir MySQL com Docker:
+Para subir MySQL com Docker, as credenciais e segredos do `docker-compose.yml`
+devem ficar em `.env`. O repositório inclui `.env.example` com os nomes esperados:
+
+```bash
+MYSQL_DATABASE=pulso_retencao
+MYSQL_APP_USER=pulso
+MYSQL_APP_PASSWORD=troque-esta-senha
+MYSQL_ROOT_PASSWORD=troque-esta-senha-root
+JWT_SECRET=troque-este-segredo
+MYSQL_HOST_PORT=3307
+APP_PORT=8080
+TZ=America/Sao_Paulo
+```
+
+Depois, suba os containers:
 
 ```bash
 docker compose up -d
 ```
+
+Observacao importante: se o volume do MySQL ja existir, `MYSQL_APP_USER`,
+`MYSQL_APP_PASSWORD` e `MYSQL_ROOT_PASSWORD` precisam bater com as credenciais
+reais daquele volume. Alterar apenas o `.env` nao reconfigura usuarios antigos.
 
 ## 7. Modelos/entities
 
