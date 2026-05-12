@@ -3,6 +3,7 @@ package br.com.fiap.ford.pulsoretencao.autenticacao.api;
 import br.com.fiap.ford.pulsoretencao.infra.security.TokenService;
 import br.com.fiap.ford.pulsoretencao.integracao.domain.ApiClient;
 import br.com.fiap.ford.pulsoretencao.integracao.service.ApiClientService;
+import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -25,6 +26,7 @@ public class ServicoAutenticacaoController {
 	}
 
 	@PostMapping("/service-token")
+	@Operation(summary = "Autenticação de cliente técnico", security = {})
 	public ResponseEntity<DadosTokenJWT> gerarTokenServico(@RequestBody @Valid DadosAutenticacaoServico dados) {
 		try {
 			ApiClient apiClient = apiClientService.autenticar(dados);
