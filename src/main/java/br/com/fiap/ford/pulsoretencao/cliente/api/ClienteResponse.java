@@ -15,6 +15,6 @@ public record ClienteResponse(
 		Boolean ativo,
 		LocalDateTime criadoEm,
 		LocalDateTime atualizadoEm,
-		Long totalInteracoes
+		LocalDateTime excluidoEm
 ) {
 }

@@ -40,6 +40,9 @@ public class Interacao {
 	@Column(name = "data_interacao", nullable = false)
 	private LocalDateTime dataInteracao;
 
+	@Column(name = "excluido_em")
+	private LocalDateTime excluidoEm;
+
 	public Interacao() {
 	}
 
@@ -94,5 +97,19 @@ public class Interacao {
 
 	public void setDataInteracao(LocalDateTime dataInteracao) {
 		this.dataInteracao = dataInteracao;
+	}
+
+	public void excluir(LocalDateTime dataExclusao) {
+		if (excluidoEm == null) {
+			excluidoEm = dataExclusao;
+		}
+	}
+
+	public boolean isExcluido() {
+		return excluidoEm != null;
+	}
+
+	public LocalDateTime getExcluidoEm() {
+		return excluidoEm;
 	}
 }

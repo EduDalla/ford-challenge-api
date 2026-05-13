@@ -2,10 +2,15 @@ package br.com.fiap.ford.pulsoretencao.cliente.api;
 
 import br.com.fiap.ford.pulsoretencao.cliente.api.ClienteRequest;
 import br.com.fiap.ford.pulsoretencao.cliente.api.ClienteResponse;
+import br.com.fiap.ford.pulsoretencao.cliente.domain.NivelRisco;
 import br.com.fiap.ford.pulsoretencao.cliente.service.ClienteService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -14,11 +19,11 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import java.net.URI;
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/clientes")
@@ -44,8 +49,12 @@ public class ClienteController {
 
 	@GetMapping
 	@Operation(summary = "Listar clientes")
-	public ResponseEntity<List<ClienteResponse>> listar() {
-		return ResponseEntity.ok(clienteService.listar());
+	public ResponseEntity<Page<ClienteResponse>> listar(
+			@RequestParam(required = false, name = "q") String termo,
+			@RequestParam(required = false) NivelRisco nivelRisco,
+			@RequestParam(required = false) Boolean ativo,
+			@PageableDefault(size = 20, sort = "nome", direction = Sort.Direction.ASC) Pageable pageable) {
+		return ResponseEntity.ok(clienteService.listar(termo, nivelRisco, ativo, pageable));
 	}
 
 	@GetMapping("/{id}")
@@ -62,7 +71,7 @@ public class ClienteController {
 	}
 
 	@DeleteMapping("/{id}")
-	@Operation(summary = "Excluir cliente")
+	@Operation(summary = "Excluir cliente logicamente")
 	public ResponseEntity<Void> excluir(@PathVariable Long id) {
 		clienteService.excluir(id);
 		return ResponseEntity.noContent().build();

@@ -54,6 +54,9 @@ public class Cliente {
 	@Column(name = "atualizado_em", nullable = false)
 	private LocalDateTime atualizadoEm;
 
+	@Column(name = "excluido_em")
+	private LocalDateTime excluidoEm;
+
 	@OneToMany(mappedBy = "cliente", cascade = CascadeType.ALL, orphanRemoval = true)
 	private List<Interacao> interacoes = new ArrayList<>();
 
@@ -146,12 +149,26 @@ public class Cliente {
 		this.ativo = ativo;
 	}
 
+	public void excluir(LocalDateTime dataExclusao) {
+		if (excluidoEm == null) {
+			excluidoEm = dataExclusao;
+		}
+	}
+
+	public boolean isExcluido() {
+		return excluidoEm != null;
+	}
+
 	public LocalDateTime getCriadoEm() {
 		return criadoEm;
 	}
 
 	public LocalDateTime getAtualizadoEm() {
 		return atualizadoEm;
+	}
+
+	public LocalDateTime getExcluidoEm() {
+		return excluidoEm;
 	}
 
 	public List<Interacao> getInteracoes() {

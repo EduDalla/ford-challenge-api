@@ -2,20 +2,26 @@ package br.com.fiap.ford.pulsoretencao.cliente.service;
 
 import br.com.fiap.ford.pulsoretencao.cliente.api.ClienteRequest;
 import br.com.fiap.ford.pulsoretencao.cliente.api.ClienteResponse;
+import br.com.fiap.ford.pulsoretencao.cliente.domain.NivelRisco;
+import br.com.fiap.ford.pulsoretencao.cliente.repository.ClienteSpecifications;
 import br.com.fiap.ford.pulsoretencao.shared.exception.BadRequestException;
-import br.com.fiap.ford.pulsoretencao.shared.exception.DatabaseException;
 import br.com.fiap.ford.pulsoretencao.shared.exception.ResourceNotFoundException;
 import br.com.fiap.ford.pulsoretencao.cliente.domain.Cliente;
 import br.com.fiap.ford.pulsoretencao.cliente.repository.ClienteRepository;
 import br.com.fiap.ford.pulsoretencao.interacao.repository.InteracaoRepository;
-import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
+import java.time.LocalDateTime;
 
 @Service
 public class ClienteService {
+
+	private static final int TAMANHO_MAXIMO_PAGINA = 100;
 
 	private final ClienteRepository clienteRepository;
 	private final InteracaoRepository interacaoRepository;
@@ -41,11 +47,14 @@ public class ClienteService {
 	}
 
 	@Transactional(readOnly = true)
-	public List<ClienteResponse> listar() {
-		return clienteRepository.findAll()
-				.stream()
-				.map(this::toResponse)
-				.toList();
+	public Page<ClienteResponse> listar(String termo, NivelRisco nivelRisco, Boolean ativo, Pageable pageable) {
+		Specification<Cliente> specification = ClienteSpecifications.naoExcluido()
+				.and(ClienteSpecifications.texto(termo))
+				.and(ClienteSpecifications.nivelRisco(nivelRisco))
+				.and(ClienteSpecifications.ativo(ativo));
+
+		return clienteRepository.findAll(specification, limitarTamanhoPagina(pageable))
+				.map(this::toResponse);
 	}
 
 	@Transactional(readOnly = true)
@@ -71,20 +80,16 @@ public class ClienteService {
 
 	@Transactional
 	public void excluir(Long id) {
-		if (!clienteRepository.existsById(id)) {
-			throw new ResourceNotFoundException("Cliente não encontrado com id " + id);
-		}
-
-		try {
-			clienteRepository.deleteById(id);
-		} catch (DataIntegrityViolationException exception) {
-			throw new DatabaseException("Não foi possível excluir o cliente por restrição do banco de dados.");
-		}
+		Cliente cliente = buscarEntidadePorId(id);
+		LocalDateTime dataExclusao = LocalDateTime.now();
+		cliente.excluir(dataExclusao);
+		interacaoRepository.softDeleteByClienteId(cliente.getId(), dataExclusao);
+		clienteRepository.save(cliente);
 	}
 
 	@Transactional(readOnly = true)
 	public Cliente buscarEntidadePorId(Long id) {
-		return clienteRepository.findById(id)
+		return clienteRepository.findByIdAndExcluidoEmIsNull(id)
 				.orElseThrow(() -> new ResourceNotFoundException("Cliente não encontrado com id " + id));
 	}
 
@@ -107,7 +112,6 @@ public class ClienteService {
 	}
 
 	private ClienteResponse toResponse(Cliente cliente) {
-		long totalInteracoes = interacaoRepository.countByClienteId(cliente.getId());
 		return new ClienteResponse(
 				cliente.getId(),
 				cliente.getNome(),
@@ -119,7 +123,14 @@ public class ClienteService {
 				cliente.getAtivo(),
 				cliente.getCriadoEm(),
 				cliente.getAtualizadoEm(),
-				totalInteracoes
+				cliente.getExcluidoEm()
 		);
+	}
+
+	private Pageable limitarTamanhoPagina(Pageable pageable) {
+		if (pageable.getPageSize() <= TAMANHO_MAXIMO_PAGINA) {
+			return pageable;
+		}
+		return PageRequest.of(pageable.getPageNumber(), TAMANHO_MAXIMO_PAGINA, pageable.getSort());
 	}
 }

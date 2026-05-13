@@ -7,10 +7,10 @@ import java.time.LocalDateTime;
 public record InteracaoResponse(
 		Long id,
 		Long clienteId,
-		String clienteNome,
 		TipoInteracao tipo,
 		String descricao,
 		String resultado,
-		LocalDateTime dataInteracao
+		LocalDateTime dataInteracao,
+		LocalDateTime excluidoEm
 ) {
 }
