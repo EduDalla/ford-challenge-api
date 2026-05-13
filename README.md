@@ -613,6 +613,7 @@ Branch: main
 Region: Oregon (US West)
 Root Directory: ford-challenge-api
 Dockerfile Path: Dockerfile
+Health Check Path: /health
 ```
 
 Com Docker, nao preencha `Build Command` nem `Start Command` se o Render usar o
@@ -626,6 +627,13 @@ O `server.port` respeita a variavel `PORT` enviada pela plataforma:
 
 ```properties
 server.port=${PORT:8080}
+```
+
+O backend tambem expoe rotas leves para deploy:
+
+```text
+GET /       -> {"status":"ok","service":"ford-challenge-api"}
+GET /health -> {"status":"ok"}
 ```
 
 Variaveis de ambiente recomendadas para a demo integrada:
