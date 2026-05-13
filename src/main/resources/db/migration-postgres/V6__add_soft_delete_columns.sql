@@ -1,0 +1,5 @@
+ALTER TABLE clientes
+    ADD COLUMN IF NOT EXISTS excluido_em TIMESTAMP(6);
+
+ALTER TABLE interacoes
+    ADD COLUMN IF NOT EXISTS excluido_em TIMESTAMP(6);
