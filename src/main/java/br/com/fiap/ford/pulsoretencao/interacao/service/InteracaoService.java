@@ -4,20 +4,25 @@ import br.com.fiap.ford.pulsoretencao.interacao.api.InteracaoRequest;
 import br.com.fiap.ford.pulsoretencao.interacao.api.InteracaoResponse;
 import br.com.fiap.ford.pulsoretencao.cliente.service.ClienteService;
 import br.com.fiap.ford.pulsoretencao.shared.exception.BadRequestException;
-import br.com.fiap.ford.pulsoretencao.shared.exception.DatabaseException;
 import br.com.fiap.ford.pulsoretencao.shared.exception.ResourceNotFoundException;
 import br.com.fiap.ford.pulsoretencao.cliente.domain.Cliente;
 import br.com.fiap.ford.pulsoretencao.interacao.domain.Interacao;
+import br.com.fiap.ford.pulsoretencao.interacao.domain.TipoInteracao;
 import br.com.fiap.ford.pulsoretencao.interacao.repository.InteracaoRepository;
-import org.springframework.dao.DataIntegrityViolationException;
+import br.com.fiap.ford.pulsoretencao.interacao.repository.InteracaoSpecifications;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.List;
 
 @Service
 public class InteracaoService {
+
+	private static final int TAMANHO_MAXIMO_PAGINA = 100;
 
 	private final InteracaoRepository interacaoRepository;
 	private final ClienteService clienteService;
@@ -42,12 +47,21 @@ public class InteracaoService {
 	}
 
 	@Transactional(readOnly = true)
-	public List<InteracaoResponse> listarPorCliente(Long clienteId) {
+	public Page<InteracaoResponse> listarPorCliente(Long clienteId, String termo, TipoInteracao tipo,
+			LocalDateTime dataInicio, LocalDateTime dataFim, Pageable pageable) {
 		clienteService.buscarEntidadePorId(clienteId);
-		return interacaoRepository.findByClienteIdOrderByDataInteracaoDesc(clienteId)
-				.stream()
-				.map(this::toResponse)
-				.toList();
+		validarIntervaloDatas(dataInicio, dataFim);
+
+		Specification<Interacao> specification = InteracaoSpecifications.naoExcluida()
+				.and(InteracaoSpecifications.clienteNaoExcluido())
+				.and(InteracaoSpecifications.clienteId(clienteId))
+				.and(InteracaoSpecifications.texto(termo))
+				.and(InteracaoSpecifications.tipo(tipo))
+				.and(InteracaoSpecifications.dataInteracaoMaiorOuIgual(dataInicio))
+				.and(InteracaoSpecifications.dataInteracaoMenorOuIgual(dataFim));
+
+		return interacaoRepository.findAll(specification, limitarTamanhoPagina(pageable))
+				.map(this::toResponse);
 	}
 
 	@Transactional(readOnly = true)
@@ -57,19 +71,13 @@ public class InteracaoService {
 
 	@Transactional
 	public void excluir(Long id) {
-		if (!interacaoRepository.existsById(id)) {
-			throw new ResourceNotFoundException("Interação não encontrada com id " + id);
-		}
-
-		try {
-			interacaoRepository.deleteById(id);
-		} catch (DataIntegrityViolationException exception) {
-			throw new DatabaseException("Não foi possível excluir a interação por restrição do banco de dados.");
-		}
+		Interacao interacao = buscarEntidadePorId(id);
+		interacao.excluir(LocalDateTime.now());
+		interacaoRepository.save(interacao);
 	}
 
 	private Interacao buscarEntidadePorId(Long id) {
-		return interacaoRepository.findById(id)
+		return interacaoRepository.findAtivaById(id)
 				.orElseThrow(() -> new ResourceNotFoundException("Interação não encontrada com id " + id));
 	}
 
@@ -79,15 +87,28 @@ public class InteracaoService {
 		}
 	}
 
+	private void validarIntervaloDatas(LocalDateTime dataInicio, LocalDateTime dataFim) {
+		if (dataInicio != null && dataFim != null && dataInicio.isAfter(dataFim)) {
+			throw new BadRequestException("A data inicial não pode ser posterior à data final.");
+		}
+	}
+
 	private InteracaoResponse toResponse(Interacao interacao) {
 		return new InteracaoResponse(
 				interacao.getId(),
 				interacao.getCliente().getId(),
-				interacao.getCliente().getNome(),
 				interacao.getTipo(),
 				interacao.getDescricao(),
 				interacao.getResultado(),
-				interacao.getDataInteracao()
+				interacao.getDataInteracao(),
+				interacao.getExcluidoEm()
 		);
+	}
+
+	private Pageable limitarTamanhoPagina(Pageable pageable) {
+		if (pageable.getPageSize() <= TAMANHO_MAXIMO_PAGINA) {
+			return pageable;
+		}
+		return PageRequest.of(pageable.getPageNumber(), TAMANHO_MAXIMO_PAGINA, pageable.getSort());
 	}
 }
