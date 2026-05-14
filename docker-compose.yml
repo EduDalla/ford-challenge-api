@@ -1,19 +1,18 @@
 services:
-  mysql:
-    image: mysql:8.0
-    container_name: pulso-retencao-mysql
+  postgres:
+    image: postgres:16-alpine
+    container_name: pulso-retencao-postgres
     environment:
-      MYSQL_DATABASE: ${MYSQL_DATABASE:-pulso_retencao}
-      MYSQL_USER: ${MYSQL_APP_USER:?Defina MYSQL_APP_USER no arquivo .env}
-      MYSQL_PASSWORD: ${MYSQL_APP_PASSWORD:?Defina MYSQL_APP_PASSWORD no arquivo .env}
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Defina MYSQL_ROOT_PASSWORD no arquivo .env}
+      POSTGRES_DB: ${POSTGRES_DB:-pulso_retencao}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD no arquivo .env}
       TZ: ${TZ:-America/Sao_Paulo}
     ports:
-      - "${MYSQL_HOST_PORT:-3307}:3306"
+      - "${POSTGRES_HOST_PORT:-5433}:5432"
     volumes:
-      - pulso-mysql-data:/var/lib/mysql
+      - pulso-postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${MYSQL_ROOT_PASSWORD}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-pulso_retencao}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -24,16 +23,17 @@ services:
       dockerfile: Dockerfile
     container_name: pulso-retencao-app
     depends_on:
-      mysql:
+      postgres:
         condition: service_healthy
     environment:
       PORT: ${APP_PORT:-8080}
-      DB_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-pulso_retencao}?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=${TZ:-America/Sao_Paulo}
-      DB_USERNAME: ${MYSQL_APP_USER:?Defina MYSQL_APP_USER no arquivo .env}
-      DB_PASSWORD: ${MYSQL_APP_PASSWORD:?Defina MYSQL_APP_PASSWORD no arquivo .env}
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+      DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-pulso_retencao}
+      DB_USERNAME: ${POSTGRES_USER:-postgres}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD no arquivo .env}
       JWT_SECRET: ${JWT_SECRET:?Defina JWT_SECRET no arquivo .env}
     ports:
       - "${APP_PORT:-8080}:8080"
 
 volumes:
-  pulso-mysql-data:
+  pulso-postgres-data:

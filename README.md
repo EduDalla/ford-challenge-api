@@ -17,14 +17,14 @@ Cliente/Postman/Swagger
 → Controller REST
 → Service
 → Repository
-→ Banco de Dados MySQL
+→ Banco de Dados PostgreSQL
 ```
 
 - **Cliente/Postman/Swagger**: envia requisições HTTP e recebe JSON.
 - **Controller REST**: expõe endpoints e define status HTTP.
 - **Service**: concentra regras de negócio, como validar duplicidade e impedir data futura.
 - **Repository**: acessa o banco via Spring Data JPA.
-- **Banco de Dados MySQL**: armazena clientes e interações.
+- **Banco de Dados PostgreSQL**: armazena clientes e interações.
 
 ## 4. Estrutura de pastas
 
@@ -84,8 +84,7 @@ enquanto erros e contratos compartilhados ficam em `shared`.
 - Spring Data JPA
 - Spring Security
 - Bean Validation
-- MySQL Connector/J
-- PostgreSQL JDBC Driver para profile `prod` com Supabase
+- PostgreSQL JDBC Driver
 - Flyway
 - Springdoc OpenAPI/Swagger UI
 - Auth0 Java JWT
@@ -94,33 +93,32 @@ enquanto erros e contratos compartilhados ficam em `shared`.
 
 ## 6. Configuração do banco de dados
 
-O projeto usa MySQL por padrão. As configurações estão em `src/main/resources/application.properties`.
+O projeto usa PostgreSQL por padrão. As configurações estão em `src/main/resources/application.properties`.
 
 ```properties
-spring.datasource.url=jdbc:mysql://localhost:3307/pulso_retencao
-spring.datasource.username=pulso
-spring.datasource.password=pulso123
+spring.datasource.url=jdbc:postgresql://localhost:5433/pulso_retencao
+spring.datasource.username=postgres
+spring.datasource.password=postgres
 spring.jpa.hibernate.ddl-auto=validate
 ```
 
 Também é possível sobrescrever por variáveis de ambiente:
 
 ```bash
-DB_URL=jdbc:mysql://localhost:3307/pulso_retencao
-DB_USERNAME=pulso
-DB_PASSWORD=pulso123
+DB_URL=jdbc:postgresql://localhost:5433/pulso_retencao
+DB_USERNAME=postgres
+DB_PASSWORD=postgres
 ```
 
-Para subir MySQL com Docker, as credenciais e segredos do `docker-compose.yml`
+Para subir PostgreSQL com Docker, as credenciais e segredos do `docker-compose.yml`
 devem ficar em `.env`. O repositório inclui `.env.example` com os nomes esperados:
 
 ```bash
-MYSQL_DATABASE=pulso_retencao
-MYSQL_APP_USER=pulso
-MYSQL_APP_PASSWORD=troque-esta-senha
-MYSQL_ROOT_PASSWORD=troque-esta-senha-root
+POSTGRES_DB=pulso_retencao
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=troque-esta-senha
 JWT_SECRET=troque-este-segredo
-MYSQL_HOST_PORT=3307
+POSTGRES_HOST_PORT=5433
 APP_PORT=8080
 TZ=America/Sao_Paulo
 ```
@@ -131,9 +129,9 @@ Depois, suba os containers:
 docker compose up -d
 ```
 
-Observacao importante: se o volume do MySQL ja existir, `MYSQL_APP_USER`,
-`MYSQL_APP_PASSWORD` e `MYSQL_ROOT_PASSWORD` precisam bater com as credenciais
-reais daquele volume. Alterar apenas o `.env` nao reconfigura usuarios antigos.
+Observacao importante: se o volume do PostgreSQL ja existir, `POSTGRES_USER`,
+`POSTGRES_PASSWORD` e `POSTGRES_DB` precisam bater com as credenciais reais
+daquele volume. Alterar apenas o `.env` nao reconfigura usuarios antigos.
 
 ## 7. Modelos/entities
 
@@ -401,7 +399,7 @@ Resposta `201 Created`:
 Pré-requisitos:
 
 - JDK 17 ou superior
-- Docker, se quiser usar o MySQL do `docker-compose.yml`
+- Docker, se quiser usar o PostgreSQL do `docker-compose.yml`
 
 Se o JDK não estiver no ambiente, configure `JAVA_HOME` antes de usar o Maven
 Wrapper:
@@ -464,7 +462,7 @@ curl -X POST http://localhost:8080/api/v1/clientes \
 - **Separação de responsabilidades**: módulos por domínio com subpacotes `api`, `domain`, `repository` e `service` quando aplicável.
 - **Boas práticas REST**: JSON, endpoints no plural e versionamento `/api/v1`.
 - **Tratamento de erros**: exceções customizadas e handler global.
-- **Banco de dados**: MySQL com Spring Data JPA e Hibernate.
+- **Banco de dados**: PostgreSQL com Spring Data JPA e Hibernate.
 - **Migrations**: Flyway cria tabelas, usuários e dados iniciais.
 
 ## 19. Integracao ML BFF para a demo
