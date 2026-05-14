@@ -20,7 +20,7 @@ public class HealthController {
 		);
 	}
 
-	@GetMapping("/health")
+	@GetMapping({"/health", "/healthCheck"})
 	@Operation(summary = "Health check da API")
 	public Map<String, String> health() {
 		return Map.of("status", "ok");

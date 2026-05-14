@@ -25,7 +25,10 @@ public class SecurityConfigurations {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers(
+                                "/",
                                 "/login",
+                                "/health",
+                                "/healthCheck",
                                 "/api/v1/auth/service-token",
                                 "/swagger-ui.html",
                                 "/swagger-ui/**",
