@@ -27,3 +27,9 @@ revoke all privileges on all functions in schema private from public;
 revoke all on schema private from anon;
 revoke all on schema private from authenticated;
 revoke all on schema private from public;
+
+alter table public.flyway_schema_history enable row level security;
+
+revoke all privileges on table public.flyway_schema_history from anon;
+revoke all privileges on table public.flyway_schema_history from authenticated;
+revoke all privileges on table public.flyway_schema_history from public;

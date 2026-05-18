@@ -18,6 +18,7 @@ comment on schema private is
 create or replace function private.set_updated_at()
 returns trigger
 language plpgsql
+set search_path = ''
 as $$
 begin
     new.atualizado_em = current_timestamp;
