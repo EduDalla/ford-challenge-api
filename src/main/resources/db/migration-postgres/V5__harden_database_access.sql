@@ -28,8 +28,5 @@ revoke all on schema private from anon;
 revoke all on schema private from authenticated;
 revoke all on schema private from public;
 
-alter table public.flyway_schema_history enable row level security;
-
-revoke all privileges on table public.flyway_schema_history from anon;
-revoke all privileges on table public.flyway_schema_history from authenticated;
-revoke all privileges on table public.flyway_schema_history from public;
+-- Nao altera public.flyway_schema_history aqui: o Flyway precisa gerenciar
+-- essa tabela durante a propria migration, e o lock pode estourar timeout no Supabase.
