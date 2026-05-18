@@ -584,6 +584,10 @@ Notas para Supabase:
 - O schema esperado e `public`.
 - As migrations PostgreSQL ficam em `src/main/resources/db/migration-postgres`.
 - O profile `prod` usa `spring.flyway.locations=classpath:db/migration-postgres`.
+- O profile `prod` usa `spring.flyway.baseline-on-migrate=true` com
+  `spring.flyway.baseline-version=0` para bancos Supabase novos cujo schema
+  `public` ja contem objetos internos, mas ainda nao possui
+  `flyway_schema_history`. A versao `0` evita pular a migration `V1`.
 - O Hibernate fica em `validate`; quem cria as tabelas em producao e o Flyway.
 - O driver PostgreSQL e o modulo Flyway PostgreSQL ficam no `pom.xml`.
 
