@@ -23,10 +23,11 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import java.net.URI;
 import java.time.LocalDate;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/informacoes-user")
-@Tag(name = "Informações do Usuário", description = "Vínculos de informações relevantes por consultor")
+@Tag(name = "Informacoes do Usuario", description = "Vinculos de informacoes relevantes por consultor")
 public class InformacaoUserController {
 
 	private final InformacaoUserService informacaoUserService;
@@ -36,7 +37,7 @@ public class InformacaoUserController {
 	}
 
 	@PostMapping
-	@Operation(summary = "Cadastrar vínculo de informação para usuário")
+	@Operation(summary = "Cadastrar vinculo de informacao para usuario")
 	public ResponseEntity<InformacaoUserResponse> criar(@Valid @RequestBody InformacaoUserRequest request) {
 		InformacaoUserResponse response = informacaoUserService.criar(request);
 		URI location = ServletUriComponentsBuilder.fromCurrentRequest()
@@ -47,9 +48,9 @@ public class InformacaoUserController {
 	}
 
 	@GetMapping
-	@Operation(summary = "Listar vínculos de informações de usuários")
+	@Operation(summary = "Listar vinculos de informacoes de usuarios")
 	public ResponseEntity<Page<InformacaoUserResponse>> listar(
-			@RequestParam(required = false) Long userId,
+			@RequestParam(required = false) UUID userId,
 			@RequestParam(required = false) Long informacaoId,
 			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dataAlerta,
 			@PageableDefault(size = 20, sort = "dataAlerta", direction = Sort.Direction.ASC) Pageable pageable) {
@@ -57,20 +58,20 @@ public class InformacaoUserController {
 	}
 
 	@GetMapping("/{id}")
-	@Operation(summary = "Buscar vínculo por ID")
+	@Operation(summary = "Buscar vinculo por ID")
 	public ResponseEntity<InformacaoUserResponse> buscarPorId(@PathVariable Long id) {
 		return ResponseEntity.ok(informacaoUserService.buscarPorId(id));
 	}
 
 	@PutMapping("/{id}")
-	@Operation(summary = "Atualizar vínculo de informação do usuário")
+	@Operation(summary = "Atualizar vinculo de informacao do usuario")
 	public ResponseEntity<InformacaoUserResponse> atualizar(@PathVariable Long id,
 			@Valid @RequestBody InformacaoUserRequest request) {
 		return ResponseEntity.ok(informacaoUserService.atualizar(id, request));
 	}
 
 	@DeleteMapping("/{id}")
-	@Operation(summary = "Excluir vínculo de informação do usuário")
+	@Operation(summary = "Excluir vinculo de informacao do usuario")
 	public ResponseEntity<Void> excluir(@PathVariable Long id) {
 		informacaoUserService.excluir(id);
 		return ResponseEntity.noContent().build();

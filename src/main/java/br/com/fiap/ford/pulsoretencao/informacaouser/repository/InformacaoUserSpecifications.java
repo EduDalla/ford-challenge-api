@@ -4,16 +4,17 @@ import br.com.fiap.ford.pulsoretencao.informacaouser.domain.InformacaoUser;
 import org.springframework.data.jpa.domain.Specification;
 
 import java.time.LocalDate;
+import java.util.UUID;
 
 public final class InformacaoUserSpecifications {
 
 	private InformacaoUserSpecifications() {
 	}
 
-	public static Specification<InformacaoUser> userId(Long userId) {
+	public static Specification<InformacaoUser> userId(UUID userId) {
 		return (root, query, criteriaBuilder) -> userId == null
 				? criteriaBuilder.conjunction()
-				: criteriaBuilder.equal(root.get("usuario").get("id"), userId);
+				: criteriaBuilder.equal(root.get("profile").get("id"), userId);
 	}
 
 	public static Specification<InformacaoUser> informacaoId(Long informacaoId) {

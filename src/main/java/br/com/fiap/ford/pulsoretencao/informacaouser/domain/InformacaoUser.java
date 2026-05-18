@@ -1,7 +1,7 @@
 package br.com.fiap.ford.pulsoretencao.informacaouser.domain;
 
 import br.com.fiap.ford.pulsoretencao.informacao.domain.Informacao;
-import br.com.fiap.ford.pulsoretencao.usuario.domain.Usuario;
+import br.com.fiap.ford.pulsoretencao.profile.domain.Profile;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -26,7 +26,7 @@ public class InformacaoUser {
 
 	@ManyToOne(fetch = FetchType.LAZY, optional = false)
 	@JoinColumn(name = "user_id", nullable = false)
-	private Usuario usuario;
+	private Profile profile;
 
 	@ManyToOne(fetch = FetchType.LAZY, optional = false)
 	@JoinColumn(name = "informacao_id", nullable = false)
@@ -41,8 +41,8 @@ public class InformacaoUser {
 	public InformacaoUser() {
 	}
 
-	public InformacaoUser(Usuario usuario, Informacao informacao, LocalDate dataAlerta) {
-		this.usuario = usuario;
+	public InformacaoUser(Profile profile, Informacao informacao, LocalDate dataAlerta) {
+		this.profile = profile;
 		this.informacao = informacao;
 		this.dataAlerta = dataAlerta;
 	}
@@ -56,12 +56,12 @@ public class InformacaoUser {
 		return id;
 	}
 
-	public Usuario getUsuario() {
-		return usuario;
+	public Profile getProfile() {
+		return profile;
 	}
 
-	public void setUsuario(Usuario usuario) {
-		this.usuario = usuario;
+	public void setProfile(Profile profile) {
+		this.profile = profile;
 	}
 
 	public Informacao getInformacao() {

@@ -1,17 +1,17 @@
 package br.com.fiap.ford.pulsoretencao.infra.security;
 
+import br.com.fiap.ford.pulsoretencao.autenticacao.api.DadosTokenJWT;
 import br.com.fiap.ford.pulsoretencao.integracao.domain.ApiClient;
 import br.com.fiap.ford.pulsoretencao.integracao.domain.ApiClientPermission;
 import br.com.fiap.ford.pulsoretencao.integracao.domain.Permission;
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.algorithms.Algorithm;
 import com.auth0.jwt.exceptions.JWTCreationException;
-import br.com.fiap.ford.pulsoretencao.usuario.domain.Usuario;
 import com.auth0.jwt.exceptions.JWTVerificationException;
 import com.auth0.jwt.interfaces.DecodedJWT;
+import com.auth0.jwt.interfaces.Verification;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import br.com.fiap.ford.pulsoretencao.autenticacao.api.DadosTokenJWT;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -21,27 +21,24 @@ import java.util.List;
 @Service
 public class TokenService {
 
-    private final String secret;
+    private static final String SERVICE_TOKEN_ISSUER = "API Ford";
+    private static final String SERVICE_TOKEN_TYPE = "service";
+    private static final String USER_TOKEN_TYPE = "user";
 
-    public TokenService(@Value("${api.security.token.secret:${JWT_SECRET:dev-secret-pulso-retencao}}") String secret) {
-        this.secret = secret;
-    }
+    private final String serviceSecret;
+    private final String supabaseJwtSecret;
+    private final String supabaseJwtIssuer;
+    private final String supabaseJwtAudience;
 
-    public DadosTokenJWT gerarToken(Usuario usuario) {
-        Instant expiraEm = dataExpiracao();
-        try {
-            var algorithm = Algorithm.HMAC256(secret);
-            String token = JWT.create()
-                    .withIssuer("API Ford")
-                    .withSubject(usuario.getLogin())
-                    .withClaim("type", "user")
-                    .withClaim("role", usuario.getPerfil().name())
-                    .withExpiresAt(expiraEm)
-                    .sign(algorithm);
-            return new DadosTokenJWT(token, "user", expiraEm);
-        } catch (JWTCreationException exception) {
-            throw new RuntimeException("Erro ao gerar o token", exception);
-        }
+    public TokenService(
+            @Value("${api.security.token.secret:${JWT_SECRET:dev-secret-pulso-retencao}}") String serviceSecret,
+            @Value("${supabase.jwt.secret:${SUPABASE_JWT_SECRET:}}") String supabaseJwtSecret,
+            @Value("${supabase.jwt.issuer:${SUPABASE_JWT_ISSUER:}}") String supabaseJwtIssuer,
+            @Value("${supabase.jwt.audience:${SUPABASE_JWT_AUDIENCE:authenticated}}") String supabaseJwtAudience) {
+        this.serviceSecret = serviceSecret;
+        this.supabaseJwtSecret = supabaseJwtSecret;
+        this.supabaseJwtIssuer = supabaseJwtIssuer;
+        this.supabaseJwtAudience = supabaseJwtAudience;
     }
 
     public DadosTokenJWT gerarTokenServico(ApiClient apiClient) {
@@ -54,25 +51,32 @@ public class TokenService {
                 .toList();
 
         try {
-            var algorithm = Algorithm.HMAC256(secret);
+            var algorithm = Algorithm.HMAC256(serviceSecret);
             String token = JWT.create()
-                    .withIssuer("API Ford")
+                    .withIssuer(SERVICE_TOKEN_ISSUER)
                     .withSubject(apiClient.getClientId())
-                    .withClaim("type", "service")
+                    .withClaim("type", SERVICE_TOKEN_TYPE)
                     .withClaim("scopes", scopes)
                     .withExpiresAt(expiraEm)
                     .sign(algorithm);
-            return new DadosTokenJWT(token, "service", expiraEm);
+            return new DadosTokenJWT(token, SERVICE_TOKEN_TYPE, expiraEm);
         } catch (JWTCreationException exception) {
-            throw new RuntimeException("Erro ao gerar o token de serviço", exception);
+            throw new RuntimeException("Erro ao gerar o token de servico", exception);
         }
     }
 
     public DadosTokenAutenticado validarToken(String token) {
         try {
-            var algorithm = Algorithm.HMAC256(secret);
-            DecodedJWT jwt = JWT.require(algorithm)
-                    .withIssuer("API Ford")
+            return validarTokenServico(token);
+        } catch (BadCredentialsJwtException exception) {
+            return validarTokenSupabase(token);
+        }
+    }
+
+    private DadosTokenAutenticado validarTokenServico(String token) {
+        try {
+            DecodedJWT jwt = JWT.require(Algorithm.HMAC256(serviceSecret))
+                    .withIssuer(SERVICE_TOKEN_ISSUER)
                     .build()
                     .verify(token);
 
@@ -83,7 +87,33 @@ public class TokenService {
                     jwt.getClaim("scopes").asList(String.class)
             );
         } catch (JWTVerificationException exception) {
-            throw new BadCredentialsJwtException("Token JWT inválido.", exception);
+            throw new BadCredentialsJwtException("Token de servico invalido.", exception);
+        }
+    }
+
+    private DadosTokenAutenticado validarTokenSupabase(String token) {
+        if (supabaseJwtSecret == null || supabaseJwtSecret.isBlank()) {
+            throw new BadCredentialsJwtException("SUPABASE_JWT_SECRET nao configurado.", null);
+        }
+
+        try {
+            Verification verification = JWT.require(Algorithm.HMAC256(supabaseJwtSecret));
+            if (supabaseJwtIssuer != null && !supabaseJwtIssuer.isBlank()) {
+                verification.withIssuer(supabaseJwtIssuer);
+            }
+            if (supabaseJwtAudience != null && !supabaseJwtAudience.isBlank()) {
+                verification.withAudience(supabaseJwtAudience);
+            }
+
+            DecodedJWT jwt = verification.build().verify(token);
+            return new DadosTokenAutenticado(
+                    jwt.getSubject(),
+                    USER_TOKEN_TYPE,
+                    null,
+                    List.of()
+            );
+        } catch (JWTVerificationException exception) {
+            throw new BadCredentialsJwtException("Token Supabase invalido.", exception);
         }
     }
 

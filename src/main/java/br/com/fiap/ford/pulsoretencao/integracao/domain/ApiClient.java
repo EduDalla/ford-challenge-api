@@ -17,7 +17,7 @@ import java.util.HashSet;
 import java.util.Set;
 
 @Entity
-@Table(name = "api_clients")
+@Table(name = "api_clients", schema = "private")
 public class ApiClient {
 
 	@Id

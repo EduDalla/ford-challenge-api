@@ -7,10 +7,10 @@ import br.com.fiap.ford.pulsoretencao.informacaouser.api.InformacaoUserResponse;
 import br.com.fiap.ford.pulsoretencao.informacaouser.domain.InformacaoUser;
 import br.com.fiap.ford.pulsoretencao.informacaouser.repository.InformacaoUserRepository;
 import br.com.fiap.ford.pulsoretencao.informacaouser.repository.InformacaoUserSpecifications;
+import br.com.fiap.ford.pulsoretencao.profile.domain.Profile;
+import br.com.fiap.ford.pulsoretencao.profile.repository.ProfileRepository;
 import br.com.fiap.ford.pulsoretencao.shared.exception.BadRequestException;
 import br.com.fiap.ford.pulsoretencao.shared.exception.ResourceNotFoundException;
-import br.com.fiap.ford.pulsoretencao.usuario.domain.Usuario;
-import br.com.fiap.ford.pulsoretencao.usuario.repository.UsuarioRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -19,6 +19,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.UUID;
 
 @Service
 public class InformacaoUserService {
@@ -26,13 +27,13 @@ public class InformacaoUserService {
 	private static final int TAMANHO_MAXIMO_PAGINA = 100;
 
 	private final InformacaoUserRepository informacaoUserRepository;
-	private final UsuarioRepository usuarioRepository;
+	private final ProfileRepository profileRepository;
 	private final InformacaoService informacaoService;
 
-	public InformacaoUserService(InformacaoUserRepository informacaoUserRepository, UsuarioRepository usuarioRepository,
+	public InformacaoUserService(InformacaoUserRepository informacaoUserRepository, ProfileRepository profileRepository,
 			InformacaoService informacaoService) {
 		this.informacaoUserRepository = informacaoUserRepository;
-		this.usuarioRepository = usuarioRepository;
+		this.profileRepository = profileRepository;
 		this.informacaoService = informacaoService;
 	}
 
@@ -40,15 +41,15 @@ public class InformacaoUserService {
 	public InformacaoUserResponse criar(InformacaoUserRequest request) {
 		validarDuplicidadeCriacao(request.userId(), request.informacaoId());
 
-		Usuario usuario = buscarUsuarioPorId(request.userId());
+		Profile profile = buscarProfilePorId(request.userId());
 		Informacao informacao = informacaoService.buscarEntidadeAtivaPorId(request.informacaoId());
-		InformacaoUser informacaoUser = new InformacaoUser(usuario, informacao, request.dataAlerta());
+		InformacaoUser informacaoUser = new InformacaoUser(profile, informacao, request.dataAlerta());
 
 		return toResponse(informacaoUserRepository.save(informacaoUser));
 	}
 
 	@Transactional(readOnly = true)
-	public Page<InformacaoUserResponse> listar(Long userId, Long informacaoId, LocalDate dataAlerta, Pageable pageable) {
+	public Page<InformacaoUserResponse> listar(UUID userId, Long informacaoId, LocalDate dataAlerta, Pageable pageable) {
 		Specification<InformacaoUser> specification = InformacaoUserSpecifications.userId(userId)
 				.and(InformacaoUserSpecifications.informacaoId(informacaoId))
 				.and(InformacaoUserSpecifications.dataAlerta(dataAlerta));
@@ -67,10 +68,10 @@ public class InformacaoUserService {
 		InformacaoUser informacaoUser = buscarEntidadePorId(id);
 		validarDuplicidadeAtualizacao(id, request.userId(), request.informacaoId());
 
-		Usuario usuario = buscarUsuarioPorId(request.userId());
+		Profile profile = buscarProfilePorId(request.userId());
 		Informacao informacao = informacaoService.buscarEntidadeAtivaPorId(request.informacaoId());
 
-		informacaoUser.setUsuario(usuario);
+		informacaoUser.setProfile(profile);
 		informacaoUser.setInformacao(informacao);
 		informacaoUser.setDataAlerta(request.dataAlerta());
 
@@ -85,30 +86,30 @@ public class InformacaoUserService {
 
 	private InformacaoUser buscarEntidadePorId(Long id) {
 		return informacaoUserRepository.findById(id)
-				.orElseThrow(() -> new ResourceNotFoundException("Informação do usuário não encontrada com id " + id));
+				.orElseThrow(() -> new ResourceNotFoundException("Informacao do usuario nao encontrada com id " + id));
 	}
 
-	private Usuario buscarUsuarioPorId(Long id) {
-		return usuarioRepository.findById(id)
-				.orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado com id " + id));
+	private Profile buscarProfilePorId(UUID id) {
+		return profileRepository.findByIdAndAtivoTrue(id)
+				.orElseThrow(() -> new ResourceNotFoundException("Profile Supabase nao encontrado ou inativo com id " + id));
 	}
 
-	private void validarDuplicidadeCriacao(Long userId, Long informacaoId) {
-		if (informacaoUserRepository.existsByUsuarioIdAndInformacaoId(userId, informacaoId)) {
-			throw new BadRequestException("Este usuário já possui vínculo com a informação informada.");
+	private void validarDuplicidadeCriacao(UUID userId, Long informacaoId) {
+		if (informacaoUserRepository.existsByProfileIdAndInformacaoId(userId, informacaoId)) {
+			throw new BadRequestException("Este usuario ja possui vinculo com a informacao informada.");
 		}
 	}
 
-	private void validarDuplicidadeAtualizacao(Long id, Long userId, Long informacaoId) {
-		if (informacaoUserRepository.existsByUsuarioIdAndInformacaoIdAndIdNot(userId, informacaoId, id)) {
-			throw new BadRequestException("Este usuário já possui vínculo com a informação informada.");
+	private void validarDuplicidadeAtualizacao(Long id, UUID userId, Long informacaoId) {
+		if (informacaoUserRepository.existsByProfileIdAndInformacaoIdAndIdNot(userId, informacaoId, id)) {
+			throw new BadRequestException("Este usuario ja possui vinculo com a informacao informada.");
 		}
 	}
 
 	private InformacaoUserResponse toResponse(InformacaoUser informacaoUser) {
 		return new InformacaoUserResponse(
 				informacaoUser.getId(),
-				informacaoUser.getUsuario().getId(),
+				informacaoUser.getProfile().getId(),
 				informacaoUser.getInformacao().getId(),
 				informacaoUser.getDataAlerta(),
 				informacaoUser.getCriadoEm()

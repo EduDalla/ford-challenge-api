@@ -9,7 +9,7 @@ import jakarta.persistence.MapsId;
 import jakarta.persistence.Table;
 
 @Entity
-@Table(name = "api_client_permissions")
+@Table(name = "api_client_permissions", schema = "private")
 public class ApiClientPermission {
 
 	@EmbeddedId
