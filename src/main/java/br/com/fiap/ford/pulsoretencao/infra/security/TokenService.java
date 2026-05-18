@@ -31,10 +31,10 @@ public class TokenService {
     private final String supabaseJwtAudience;
 
     public TokenService(
-            @Value("${api.security.token.secret:${JWT_SECRET:dev-secret-pulso-retencao}}") String serviceSecret,
-            @Value("${supabase.jwt.secret:${SUPABASE_JWT_SECRET:}}") String supabaseJwtSecret,
-            @Value("${supabase.jwt.issuer:${SUPABASE_JWT_ISSUER:}}") String supabaseJwtIssuer,
-            @Value("${supabase.jwt.audience:${SUPABASE_JWT_AUDIENCE:authenticated}}") String supabaseJwtAudience) {
+            @Value("${api.security.token.secret:dev-secret-pulso-retencao}") String serviceSecret,
+            @Value("${supabase.jwt.secret:}") String supabaseJwtSecret,
+            @Value("${supabase.jwt.issuer:}") String supabaseJwtIssuer,
+            @Value("${supabase.jwt.audience:authenticated}") String supabaseJwtAudience) {
         this.serviceSecret = serviceSecret;
         this.supabaseJwtSecret = supabaseJwtSecret;
         this.supabaseJwtIssuer = supabaseJwtIssuer;

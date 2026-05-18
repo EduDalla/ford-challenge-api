@@ -117,8 +117,11 @@ SUPABASE_JWT_ISSUER=https://PROJECT_REF.supabase.co/auth/v1
 SUPABASE_JWT_AUDIENCE=authenticated
 ```
 
-`SUPABASE_JWT_ISSUER` pode ficar vazio em ambiente local. Em producao,
-configure com o issuer do projeto Supabase.
+`SUPABASE_JWT_SECRET` e necessario para aceitar tokens de usuario Supabase. Se
+ele estiver vazio, o backend ainda sobe e tokens tecnicos continuam funcionando,
+mas Bearer tokens de usuario Supabase recebem `401`. `SUPABASE_JWT_ISSUER` pode
+ficar vazio em ambiente local. Em producao, configure com o issuer do projeto
+Supabase.
 
 ### Cliente Tecnico
 
