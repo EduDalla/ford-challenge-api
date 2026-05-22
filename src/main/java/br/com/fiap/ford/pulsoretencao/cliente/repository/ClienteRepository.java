@@ -10,6 +10,10 @@ public interface ClienteRepository extends JpaRepository<Cliente, Long>, JpaSpec
 
 	Optional<Cliente> findByIdAndExcluidoEmIsNull(Long id);
 
+	Optional<Cliente> findByEmailIgnoreCaseAndExcluidoEmIsNull(String email);
+
+	Optional<Cliente> findByDocumentoAndExcluidoEmIsNull(String documento);
+
 	boolean existsByEmail(String email);
 
 	boolean existsByDocumento(String documento);

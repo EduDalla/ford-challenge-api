@@ -42,6 +42,10 @@ Em producao, o banco esperado e Supabase Postgres com estes schemas/tabelas:
 auth.users
 public.profiles
 public.clientes
+public.veiculos
+public.missoes
+public.missao_acoes
+public.missao_resultados
 public.interacoes
 public.informacoes
 public.informacoes_user
@@ -187,12 +191,60 @@ GET  /v3/api-docs              OpenAPI JSON
 GET  /swagger-ui.html          Swagger UI
 POST /api/v1/auth/service-token token tecnico
 POST /api/ml/predict           BFF para FastAPI ML
+GET  /api/v1/me                usuario Supabase autenticado
+GET  /api/v1/radar/prioridades fila priorizada do Radar
+GET  /api/v1/missoes           missoes visiveis para o usuario
+POST /api/v1/missoes           cria missao a partir do Motor ML
+GET  /api/v1/missoes/{id}      ficha da missao
+GET  /api/v1/cartoes/{codigo}  abre missao por Cartao de Recuperacao
+PATCH /api/v1/missoes/{id}/status atualiza estado da missao
+POST /api/v1/missoes/{id}/acoes registra contato/acao
+POST /api/v1/missoes/{id}/resultado registra Memoria de Resultado
+GET  /api/v1/indicadores/consultor indicadores do consultor logado
+GET  /api/v1/indicadores/retencao  indicadores agregados
 ```
 
 `POST /api/ml/predict` aceita:
 
 - service token Java com authority `SCOPE_ml:predict`; ou
 - Supabase user token cujo `public.profiles.perfil` seja `ADMIN`, `GESTOR` ou `ANALISTA`.
+
+Os endpoints `/api/v1/missoes`, `/api/v1/cartoes`, `/api/v1/radar` e
+`/api/v1/indicadores` exigem token Supabase humano. `ANALISTA` ve missoes
+livres ou proprias; `GESTOR` e `ADMIN` veem a fila e indicadores agregados.
+Quando um analista assume uma missao, o BFF grava `responsavel_id` com o
+`public.profiles.id` extraido do JWT Supabase.
+
+### Exemplo De Criacao De Missao
+
+```bash
+curl -X POST https://ford-challenge-api.onrender.com/api/v1/missoes \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <supabase_access_token_admin_ou_gestor>" \
+  -d '{
+    "clienteId": 1,
+    "veiculoId": 1,
+    "prazo": "Hoje",
+    "valorPotencial": 980,
+    "impactoVinShareEstimado": 1.4,
+    "predicao": {
+      "features": {
+        "ano_modelo": 2020,
+        "qtde_revisoes_ate_corte": 2,
+        "meses_desde_ultimo_servico_ate_corte": 14.2,
+        "meses_relacionamento_ate_corte": 48.0,
+        "n_dealers_usados_ate_corte": 1,
+        "km_max_ate_corte": 48200,
+        "pct_agenda_ate_corte": 0.65,
+        "intervalo_medio_revisoes_dias_ate_corte": 220.0,
+        "dias_ate_primeira_revisao": 180,
+        "idade_veiculo_meses_ate_corte": 54.0,
+        "modelo": "KA"
+      },
+      "modelo_veiculo": "Ka"
+    }
+  }'
+```
 
 ## Integracao FastAPI ML
 
@@ -268,11 +320,28 @@ CORS_ALLOWED_ORIGINS=*
 
 Nao commite `.env`, connection string real, senha Supabase, JWT secret ou tokens.
 
+Para Expo Web local, use uma origem explicita em producao quando possivel:
+
+```env
+CORS_ALLOWED_ORIGINS=http://localhost:8081
+```
+
 ## Roteiro Rapido De Demo
 
 1. Abrir `https://ford-challenge-api.onrender.com/health`.
 2. Abrir `https://ford-challenge-api.onrender.com/swagger-ui.html`.
 3. Autenticar usuario no Supabase ou gerar service token Java.
-4. Chamar `POST /api/ml/predict`.
-5. Confirmar resposta com `ml` e `missao`.
-6. No mobile, manter mock como fallback e apontar API real quando a demo for integrada.
+4. Conferir `GET /api/v1/me`.
+5. Conferir `GET /api/v1/radar/prioridades`.
+6. No mobile, usar `EXPO_PUBLIC_USE_MOCK=false` e `EXPO_PUBLIC_USE_MOCK_DATA=false`.
+7. Abrir missao por lista ou por `CARD-001`.
+8. Registrar "Assumir missao", "Contato feito", "Agendado" e "Recuperado".
+9. Conferir `GET /api/v1/indicadores/consultor`.
+
+## Checklist Sprint 24/05
+
+- Web Services: Swagger exposto, endpoints REST versionados, metodos HTTP corretos e BFF chamando FastAPI ML.
+- Mobile: Expo consome `/api/v1`, navega por missao/cartao e registra acoes.
+- QA: roteiro de demo testado, fallback mock documentado e erros padronizados.
+- Cybersecurity: Supabase JWT, RBAC, CORS no Spring Security, validacao de payload e logs sem segredos.
+- IA/ML: FastAPI retorna perfil, risco, score e acao recomendada sem usar variaveis futuras na classificacao.
