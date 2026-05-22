@@ -109,23 +109,27 @@ O endpoint `/login` foi removido do fluxo operacional. Para usuario humano:
 
 1. O app autentica no Supabase.
 2. O app envia `Authorization: Bearer <supabase_access_token>` ao Java.
-3. O Java valida o JWT com `SUPABASE_JWT_SECRET`.
+3. O Java valida o JWT via `SUPABASE_JWKS_URL` para chaves novas ECC/RSA,
+   ou via `SUPABASE_JWT_SECRET` para projetos ainda em legacy HS256.
 4. O Java extrai `sub` e busca `public.profiles.id`.
 5. O campo `profiles.perfil` vira role Spring: `ROLE_ADMIN`, `ROLE_ANALISTA` ou `ROLE_GESTOR`.
 
 Variaveis:
 
 ```env
-SUPABASE_JWT_SECRET=jwt_secret_do_supabase
+SUPABASE_JWKS_URL=https://PROJECT_REF.supabase.co/auth/v1/.well-known/jwks.json
 SUPABASE_JWT_ISSUER=https://PROJECT_REF.supabase.co/auth/v1
 SUPABASE_JWT_AUDIENCE=authenticated
+# Opcional, apenas se o projeto ainda emitir tokens legacy HS256:
+SUPABASE_JWT_SECRET=legacy_jwt_secret_do_supabase
 ```
 
-`SUPABASE_JWT_SECRET` e necessario para aceitar tokens de usuario Supabase. Se
-ele estiver vazio, o backend ainda sobe e tokens tecnicos continuam funcionando,
-mas Bearer tokens de usuario Supabase recebem `401`. `SUPABASE_JWT_ISSUER` pode
-ficar vazio em ambiente local. Em producao, configure com o issuer do projeto
-Supabase.
+`SUPABASE_JWKS_URL` e o caminho recomendado para projetos Supabase com JWT
+Signing Keys novas, como `ECC (P-256)`. `SUPABASE_JWT_SECRET` fica como fallback
+para tokens legacy HS256. Se os dois estiverem vazios, o backend ainda sobe e
+tokens tecnicos continuam funcionando, mas Bearer tokens de usuario Supabase
+recebem `401`. Em producao, configure `SUPABASE_JWT_ISSUER` com o issuer do
+projeto Supabase.
 
 ### Cliente Tecnico
 
@@ -309,7 +313,7 @@ SPRING_PROFILES_ACTIVE=prod
 SPRING_DATASOURCE_URL=jdbc:postgresql://HOST_POOLER:5432/postgres
 SPRING_DATASOURCE_USERNAME=postgres.xxxxx
 SPRING_DATASOURCE_PASSWORD=SENHA_SUPABASE
-SUPABASE_JWT_SECRET=jwt_secret_do_supabase
+SUPABASE_JWKS_URL=https://PROJECT_REF.supabase.co/auth/v1/.well-known/jwks.json
 SUPABASE_JWT_ISSUER=https://PROJECT_REF.supabase.co/auth/v1
 SUPABASE_JWT_AUDIENCE=authenticated
 JWT_SECRET=segredo_interno_para_service_tokens
