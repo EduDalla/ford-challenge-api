@@ -6,6 +6,9 @@ import java.util.List;
 import java.util.Map;
 
 public record MlPredictResponse(
+		@JsonProperty("reference_id")
+		String referenceId,
+
 		String prediction,
 
 		@JsonProperty("churn_probability")
@@ -22,6 +25,11 @@ public record MlPredictResponse(
 
 		@JsonProperty("acao_recomendada")
 		String acaoRecomendada,
+
+		String motivo,
+
+		@JsonProperty("canal_recomendado")
+		String canalRecomendado,
 
 		@JsonProperty("historico_problemas")
 		List<Map<String, Object>> historicoProblemas

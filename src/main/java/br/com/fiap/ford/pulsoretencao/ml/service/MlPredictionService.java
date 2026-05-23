@@ -1,6 +1,8 @@
 package br.com.fiap.ford.pulsoretencao.ml.service;
 
 import br.com.fiap.ford.pulsoretencao.ml.api.MlBffPredictResponse;
+import br.com.fiap.ford.pulsoretencao.ml.api.MlBatchPredictRequest;
+import br.com.fiap.ford.pulsoretencao.ml.api.MlBatchPredictResponse;
 import br.com.fiap.ford.pulsoretencao.ml.api.MlMissaoResponse;
 import br.com.fiap.ford.pulsoretencao.ml.api.MlPredictRequest;
 import br.com.fiap.ford.pulsoretencao.ml.api.MlPredictResponse;
@@ -50,6 +52,35 @@ public class MlPredictionService {
 							+ sanitizeBody(exception.getResponseBodyAsString()));
 		} catch (ResourceAccessException exception) {
 			throw new BadRequestException("FastAPI ML indisponivel ou timeout ao chamar /predict.");
+		} catch (RestClientException exception) {
+			throw new BadRequestException("Falha ao chamar FastAPI ML: " + exception.getMessage());
+		}
+	}
+
+	public MlBatchPredictResponse predictBatch(MlBatchPredictRequest request, String tokenOverride) {
+		String token = resolveToken(tokenOverride);
+
+		try {
+			MlBatchPredictResponse response = fordMlRestClient.post()
+					.uri("/predict-batch")
+					.headers(headers -> headers.setBearerAuth(token))
+					.body(request)
+					.retrieve()
+					.body(MlBatchPredictResponse.class);
+
+			if (response == null || response.items() == null) {
+				throw new BadRequestException("FastAPI ML retornou resposta batch vazia.");
+			}
+			if (response.items().size() != request.items().size()) {
+				throw new BadRequestException("FastAPI ML retornou quantidade diferente de itens no batch.");
+			}
+			return response;
+		} catch (RestClientResponseException exception) {
+			throw new BadRequestException(
+					"FastAPI ML retornou " + exception.getStatusCode().value() + ": "
+							+ sanitizeBody(exception.getResponseBodyAsString()));
+		} catch (ResourceAccessException exception) {
+			throw new BadRequestException("FastAPI ML indisponivel ou timeout ao chamar /predict-batch.");
 		} catch (RestClientException exception) {
 			throw new BadRequestException("Falha ao chamar FastAPI ML: " + exception.getMessage());
 		}

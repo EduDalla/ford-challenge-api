@@ -57,6 +57,8 @@ public class SecurityConfigurations {
                         ).permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/ml/predict")
                         .access((authentication, context) -> new AuthorizationDecision(podeAcessarMl(authentication.get())))
+                        .requestMatchers(HttpMethod.POST, "/api/v1/ml/predicoes/processar-lote")
+                        .access((authentication, context) -> new AuthorizationDecision(podeAcessarMl(authentication.get())))
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(securityFilter, UsernamePasswordAuthenticationFilter.class)
