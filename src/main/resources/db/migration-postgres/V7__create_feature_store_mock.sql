@@ -404,7 +404,7 @@ begin
         p.dias_primeira_revisao,
         p.idade_veiculo_meses,
         p.payload_predict,
-        encode(digest(p.payload_predict::text, 'sha256'), 'hex'),
+        encode(extensions.digest(p.payload_predict::text, 'sha256'), 'hex'),
         'vin_share_v1',
         p.imputation_report,
         current_timestamp
