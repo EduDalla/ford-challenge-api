@@ -43,7 +43,7 @@ public class TokenService {
     private final JwkProvider supabaseJwkProvider;
 
     public TokenService(
-            @Value("${api.security.token.secret:dev-secret-pulso-retencao}") String serviceSecret,
+            @Value("${api.security.token.secret}") String serviceSecret,
             @Value("${supabase.jwt.secret:}") String supabaseJwtSecret,
             @Value("${supabase.jwks-url:}") String supabaseJwksUrl,
             @Value("${supabase.jwt.issuer:}") String supabaseJwtIssuer,

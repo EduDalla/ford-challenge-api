@@ -89,8 +89,7 @@ public class ProcessarPredicoesMlService {
 		try {
 			MlFeaturesRequest featuresRequest = objectMapper.readValue(snapshot.getPayloadPredict(), MlFeaturesRequest.class);
 			MlBffPredictResponse bffPredictResponse = mlPredictionService.predict(
-					new MlPredictRequest(featuresRequest, snapshot.getModelo()),
-					null
+					new MlPredictRequest(featuresRequest, snapshot.getModelo())
 			);
 			MlPredictResponse response = bffPredictResponse.ml();
 			if (response == null) {

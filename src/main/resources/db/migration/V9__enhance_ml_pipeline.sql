@@ -10,7 +10,7 @@ CREATE INDEX IF NOT EXISTS idx_vin_share_servicos_dealer ON vin_share_servicos (
 
 ALTER TABLE ml_feature_refresh_queue ADD COLUMN IF NOT EXISTS motivo VARCHAR(80) DEFAULT 'servico_alterado' NOT NULL;
 ALTER TABLE ml_feature_refresh_queue ADD COLUMN IF NOT EXISTS processado_em DATETIME(6);
-ALTER TABLE ml_feature_refresh_queue ADD COLUMN IF NOT EXISTS erro CLOB;
+ALTER TABLE ml_feature_refresh_queue ADD COLUMN IF NOT EXISTS erro VARCHAR(255);
 ALTER TABLE ml_feature_refresh_queue ADD COLUMN IF NOT EXISTS atualizado_em DATETIME(6) DEFAULT CURRENT_TIMESTAMP NOT NULL;
 
 ALTER TABLE ml_feature_refresh_queue DROP CONSTRAINT IF EXISTS ck_ml_feature_refresh_queue_status;
@@ -31,7 +31,7 @@ ALTER TABLE ml_feature_refresh_queue ADD CONSTRAINT ck_ml_feature_refresh_queue_
 
 ALTER TABLE vin_share_feature_snapshots ADD COLUMN IF NOT EXISTS status_predicao VARCHAR(30) DEFAULT 'pending' NOT NULL;
 ALTER TABLE vin_share_feature_snapshots ADD COLUMN IF NOT EXISTS tentativas_predicao INTEGER DEFAULT 0 NOT NULL;
-ALTER TABLE vin_share_feature_snapshots ADD COLUMN IF NOT EXISTS erro_predicao CLOB;
+ALTER TABLE vin_share_feature_snapshots ADD COLUMN IF NOT EXISTS erro_predicao VARCHAR(255);
 ALTER TABLE vin_share_feature_snapshots ADD COLUMN IF NOT EXISTS predito_em DATETIME(6);
 ALTER TABLE vin_share_feature_snapshots ADD COLUMN IF NOT EXISTS atualizado_em DATETIME(6) DEFAULT CURRENT_TIMESTAMP NOT NULL;
 
@@ -55,7 +55,7 @@ CREATE TABLE IF NOT EXISTS job_execution_logs (
     total_processed INTEGER DEFAULT 0 NOT NULL,
     total_success INTEGER DEFAULT 0 NOT NULL,
     total_failed INTEGER DEFAULT 0 NOT NULL,
-    error_message CLOB,
+    error_message VARCHAR(255),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 

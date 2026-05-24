@@ -11,6 +11,8 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -22,10 +24,12 @@ public class SecurityFilter extends OncePerRequestFilter {
 
     private final TokenService tokenService;
     private final ProfileRepository profileRepository;
+    private final Environment environment;
 
-    public SecurityFilter(TokenService tokenService, ProfileRepository profileRepository) {
+    public SecurityFilter(TokenService tokenService, ProfileRepository profileRepository, Environment environment) {
         this.tokenService = tokenService;
         this.profileRepository = profileRepository;
+        this.environment = environment;
     }
 
     @Override
@@ -35,11 +39,18 @@ public class SecurityFilter extends OncePerRequestFilter {
         }
 
         String path = request.getServletPath();
-        return path.equals("/health")
+        return path.equals("/")
+                || path.equals("/health")
                 || path.equals("/actuator/health")
-                || path.equals("/swagger-ui.html")
+                || path.equals("/healthCheck")
+                || isPublicDocsPath(path);
+    }
+
+    private boolean isPublicDocsPath(String path) {
+        return !environment.acceptsProfiles(Profiles.of("prod"))
+                && (path.equals("/swagger-ui.html")
                 || path.startsWith("/swagger-ui/")
-                || path.startsWith("/v3/api-docs/");
+                || path.startsWith("/v3/api-docs/"));
     }
 
     @Override

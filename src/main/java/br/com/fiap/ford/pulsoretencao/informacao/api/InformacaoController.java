@@ -9,6 +9,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -25,6 +26,7 @@ import java.net.URI;
 @RestController
 @RequestMapping("/api/v1/informacoes")
 @Tag(name = "Informações", description = "Catálogo de informações relevantes para consultores")
+@PreAuthorize("hasAnyRole('ADMIN','GESTOR','ANALISTA')")
 public class InformacaoController {
 
 	private final InformacaoService informacaoService;
@@ -35,6 +37,7 @@ public class InformacaoController {
 
 	@PostMapping
 	@Operation(summary = "Cadastrar informação")
+	@PreAuthorize("hasAnyRole('ADMIN','GESTOR')")
 	public ResponseEntity<InformacaoResponse> criar(@Valid @RequestBody InformacaoRequest request) {
 		InformacaoResponse response = informacaoService.criar(request);
 		URI location = ServletUriComponentsBuilder.fromCurrentRequest()
@@ -61,6 +64,7 @@ public class InformacaoController {
 
 	@PutMapping("/{id}")
 	@Operation(summary = "Atualizar informação")
+	@PreAuthorize("hasAnyRole('ADMIN','GESTOR')")
 	public ResponseEntity<InformacaoResponse> atualizar(@PathVariable Long id,
 			@Valid @RequestBody InformacaoRequest request) {
 		return ResponseEntity.ok(informacaoService.atualizar(id, request));
@@ -68,6 +72,7 @@ public class InformacaoController {
 
 	@DeleteMapping("/{id}")
 	@Operation(summary = "Desativar informação")
+	@PreAuthorize("hasAnyRole('ADMIN','GESTOR')")
 	public ResponseEntity<Void> desativar(@PathVariable Long id) {
 		informacaoService.desativar(id);
 		return ResponseEntity.noContent().build();
