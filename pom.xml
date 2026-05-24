@@ -30,7 +30,9 @@
 		<java.version>17</java.version>
 		<java-jwt.version>4.5.2</java-jwt.version>
 		<jwks-rsa.version>0.23.0</jwks-rsa.version>
+		<postgresql.version>42.7.11</postgresql.version>
 		<springdoc.version>3.0.3</springdoc.version>
+		<tomcat.version>11.0.22</tomcat.version>
 	</properties>
 	<dependencies>
 		<!-- Spring Boot -->
