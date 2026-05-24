@@ -8,6 +8,7 @@ import org.springframework.core.env.Profiles;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.authorization.AuthorizationDecision;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -31,11 +32,13 @@ import java.util.Set;
 
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity
 public class SecurityConfigurations {
 
     private static final Set<String> ML_AUTHORITIES = Set.of(
             "SCOPE_ml:predict",
             "ROLE_ADMIN",
+            "ROLE_GESTOR",
             "ROLE_ANALISTA"
     );
 
@@ -62,21 +65,31 @@ public class SecurityConfigurations {
         return http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource))
                 .csrf(AbstractHttpConfigurer::disable)
+                .httpBasic(AbstractHttpConfigurer::disable)
+                .formLogin(AbstractHttpConfigurer::disable)
+                .logout(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authorizeHttpRequests(authorize -> authorize
-                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        .requestMatchers(
-                                "/health",
-                                "/actuator/health",
+                .authorizeHttpRequests(authorize -> {
+                    authorize.requestMatchers(HttpMethod.OPTIONS, "/**").permitAll();
+                    authorize.requestMatchers(
+                            "/",
+                            "/health",
+                            "/healthCheck",
+                            "/actuator/health"
+                    ).permitAll();
+                    authorize.requestMatchers(HttpMethod.POST, "/api/v1/auth/service-token").permitAll();
+                    if (!environment.acceptsProfiles(Profiles.of("prod"))) {
+                        authorize.requestMatchers(
                                 "/swagger-ui.html",
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**"
-                        ).permitAll()
-                        .requestMatchers("/api/ml/**", "/api/v1/ml/**")
-                        .access((authentication, context) ->
-                                new AuthorizationDecision(podeAcessarMl(authentication.get(), context.getRequest())))
-                        .anyRequest().authenticated()
-                )
+                        ).permitAll();
+                    }
+                    authorize.requestMatchers("/api/ml/**", "/api/v1/ml/**")
+                            .access((authentication, context) ->
+                                    new AuthorizationDecision(podeAcessarMl(authentication.get(), context.getRequest())));
+                    authorize.anyRequest().authenticated();
+                })
                 .addFilterBefore(securityFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();
     }

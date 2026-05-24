@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -36,7 +37,17 @@ class PulsoRetencaoApplicationTests {
 
 		mockMvc.perform(get("/actuator/health"))
 				.andExpect(status().isOk())
-				.andExpect(jsonPath("$.status").value("ok"));
+				.andExpect(jsonPath("$.status").value("UP"));
+	}
+
+	@Test
+	void endpointTokenServicoEPublicoMasRejeitaCredenciaisInvalidas() throws Exception {
+		mockMvc.perform(post("/api/v1/auth/service-token")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"clientId":"cliente-inexistente","clientSecret":"segredo-invalido"}
+								"""))
+				.andExpect(status().isUnauthorized());
 	}
 
 	@Test

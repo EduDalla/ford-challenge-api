@@ -50,11 +50,12 @@ public class MlBatchPredictionService {
 	public MlBatchPredictionService(
 			JdbcTemplate jdbcTemplate,
 			TransactionTemplate transactionTemplate,
+			ObjectMapper objectMapper,
 			MlPredictionService mlPredictionService,
 			@Value("${ford.ml.model-version:churn_pos_venda_rf_calibrated}") String modeloVersao) {
 		this.jdbcTemplate = jdbcTemplate;
 		this.transactionTemplate = transactionTemplate;
-		this.objectMapper = new ObjectMapper();
+		this.objectMapper = objectMapper;
 		this.mlPredictionService = mlPredictionService;
 		this.modeloVersao = modeloVersao;
 	}

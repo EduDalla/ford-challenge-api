@@ -21,6 +21,17 @@ jobs:
       - name: Set lowercase image name
         run: echo "IMAGE_NAME=ghcr.io/${GITHUB_REPOSITORY,,}" >> $GITHUB_ENV
 
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Run tests
+        run: |
+          chmod +x mvnw
+          ./mvnw -B test
+
       - name: Login to GHCR
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
 
@@ -28,7 +39,20 @@ jobs:
         run: |
           docker build \
             --label "org.opencontainers.image.source=https://github.com/${{ github.repository }}" \
+            -t $IMAGE_NAME:${{ github.sha }} \
             -t $IMAGE_NAME:latest .
 
+      - name: Scan image
+        uses: aquasecurity/trivy-action@0.29.0
+        with:
+          image-ref: ${{ env.IMAGE_NAME }}:${{ github.sha }}
+          format: table
+          exit-code: "1"
+          ignore-unfixed: true
+          vuln-type: os,library
+          severity: CRITICAL,HIGH
+
       - name: Push image
-        run: docker push $IMAGE_NAME:latest
+        run: |
+          docker push $IMAGE_NAME:${{ github.sha }}
+          docker push $IMAGE_NAME:latest

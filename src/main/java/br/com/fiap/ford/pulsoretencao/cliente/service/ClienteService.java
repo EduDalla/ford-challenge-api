@@ -115,9 +115,9 @@ public class ClienteService {
 		return new ClienteResponse(
 				cliente.getId(),
 				cliente.getNome(),
-				cliente.getEmail(),
-				cliente.getTelefone(),
-				cliente.getDocumento(),
+				mascararEmail(cliente.getEmail()),
+				mascararTelefone(cliente.getTelefone()),
+				mascararDocumento(cliente.getDocumento()),
 				cliente.getSegmento(),
 				cliente.getNivelRisco(),
 				cliente.getAtivo(),
@@ -125,6 +125,38 @@ public class ClienteService {
 				cliente.getAtualizadoEm(),
 				cliente.getExcluidoEm()
 		);
+	}
+
+	private String mascararEmail(String email) {
+		if (email == null || email.isBlank()) {
+			return email;
+		}
+		int atIndex = email.indexOf('@');
+		if (atIndex <= 0) {
+			return "***";
+		}
+		return email.charAt(0) + "***" + email.substring(atIndex);
+	}
+
+	private String mascararTelefone(String telefone) {
+		String fim = ultimosDigitos(telefone, 4);
+		return fim == null ? telefone : "(**) *****-" + fim;
+	}
+
+	private String mascararDocumento(String documento) {
+		String fim = ultimosDigitos(documento, 4);
+		return fim == null ? documento : "***" + fim;
+	}
+
+	private String ultimosDigitos(String value, int quantidade) {
+		if (value == null || value.isBlank()) {
+			return null;
+		}
+		String digits = value.replaceAll("\\D", "");
+		if (digits.length() < quantidade) {
+			return null;
+		}
+		return digits.substring(digits.length() - quantidade);
 	}
 
 	private Pageable limitarTamanhoPagina(Pageable pageable) {
