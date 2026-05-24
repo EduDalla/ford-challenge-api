@@ -60,6 +60,7 @@ public class SecurityConfigurations {
     public SecurityFilterChain securityFilterChain(
             HttpSecurity http,
             SecurityFilter securityFilter,
+            RateLimitFilter rateLimitFilter,
             CorsConfigurationSource corsConfigurationSource
     ) throws Exception {
         return http
@@ -90,6 +91,7 @@ public class SecurityConfigurations {
                                     new AuthorizationDecision(podeAcessarMl(authentication.get(), context.getRequest())));
                     authorize.anyRequest().authenticated();
                 })
+                .addFilterBefore(rateLimitFilter, SecurityFilter.class)
                 .addFilterBefore(securityFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();
     }

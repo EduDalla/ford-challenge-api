@@ -1,6 +1,7 @@
 package br.com.fiap.ford.pulsoretencao.informacao.api;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 public record InformacaoRequest(
@@ -12,6 +13,7 @@ public record InformacaoRequest(
 		@Size(max = 255, message = "A descrição deve ter no máximo 255 caracteres")
 		String descricao,
 
+		@NotNull(message = "O status ativo é obrigatório")
 		Boolean ativo
 ) {
 }

@@ -29,6 +29,7 @@ public record ClienteRequest(
 		@NotNull(message = "O nível de risco é obrigatório")
 		NivelRisco nivelRisco,
 
+		@NotNull(message = "O status ativo é obrigatório")
 		Boolean ativo
 ) {
 }

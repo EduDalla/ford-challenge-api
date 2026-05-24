@@ -1,0 +1,131 @@
+@startuml diagrama_arquitetura_servicos
+!theme plain
+skinparam backgroundColor #F8F9FA
+skinparam defaultFontName "Segoe UI"
+skinparam defaultFontSize 13
+skinparam ArrowColor #4A4A4A
+skinparam componentStyle rectangle
+skinparam padding 8
+
+skinparam component {
+    BackgroundColor #DBEAFE
+    BorderColor #2563EB
+    FontColor #1E3A5F
+    FontStyle bold
+}
+
+skinparam database {
+    BackgroundColor #D1FAE5
+    BorderColor #059669
+    FontColor #064E3B
+}
+
+skinparam package {
+    BackgroundColor #FFFBEB
+    BorderColor #D97706
+    FontColor #78350F
+}
+
+skinparam actor {
+    BackgroundColor #EDE9FE
+    BorderColor #7C3AED
+}
+
+title **Pulso de Retenção Ford — Arquitetura de Serviços**\n<size:11>(Visão SOA — integração entre componentes e dependências externas)</size>
+
+' ─── Atores ───────────────────────────────────────
+actor "Consultor Ford" as consultor
+actor "Admin / Gestor" as admin
+
+' ─── App Mobile ───────────────────────────────────
+package "Camada de Apresentação" {
+    component "React Native App\n(Expo / Expo Router)" as mobile
+    component "Fake API\n(Node.js + Express)" as fakeapi
+    note right of fakeapi : Utilizada em modo mock\npara desenvolvimento sem BFF
+}
+
+' ─── BFF Spring Boot ──────────────────────────────
+package "BFF — Pulso Retencão API\n(Spring Boot 4 / Java 17)" {
+
+    component "Rate Limit Filter\n(60 req/min, 10 auth/min)" as ratelimit
+    component "Security Filter\n(JWT HS256 + Supabase RS256)" as secfilter
+
+    component "AuthController\n/api/v1/auth/service-token" as authctrl
+    component "ClienteController\n/api/v1/clientes" as clientectrl
+    component "MissaoController\n/api/v1/missoes" as missaoctrl
+    component "InteracaoController\n/api/v1/interacoes" as interacaoctrl
+    component "MlPredictionController\n/api/v1/ml/predict" as mlctrl
+    component "MlBatchPredictionController\n/api/v1/ml/batch" as mlbatchctrl
+    component "HealthController\n/health, /actuator/health" as healthctrl
+
+    component "MissaoService\nClienteService\nInteracaoService" as services
+    component "ProcessarPredicoesMlService\nRefreshFeatureSnapshotsService" as pipeline
+    component "MlPredictionService\nApiClientService" as mlservice
+    component "GlobalExceptionHandler\n(RFC 7807 / ErrorResponse)" as exhandler
+}
+
+' ─── ML API ───────────────────────────────────────
+package "ML API — Ford VinGuard\n(FastAPI / Python)" {
+    component "POST /predict\n(churn individual)" as mlpredict
+    component "POST /batch-predict\n(lote de clientes)" as mlbatch
+    component "GET /model-info\n(versão e métricas)" as mlinfo
+    note right of mlpredict : Random Forest calibrado\nAUC-ROC: 0.9747\nK-Means: 4 perfis de retenção
+}
+
+' ─── Supabase ─────────────────────────────────────
+package "Supabase (BaaS)" {
+    database "PostgreSQL 16\n(Supabase Cloud)" as pg
+    component "Auth Service\nJWT / JWKS" as supabase_auth
+    note right of pg : 8 migrations Flyway\nRLS habilitado\nCriptografia AES-256 em repouso
+}
+
+' ─── CI/CD ────────────────────────────────────────
+package "CI/CD & Infraestrutura" {
+    component "GitHub Actions\n(build + test + Trivy scan)" as ci
+    component "GHCR\n(Container Registry)" as ghcr
+    component "Render\n(Cloud Hosting)" as render
+    component "Docker\n(multi-stage, user não-root)" as docker
+}
+
+' ─── Relações principais ──────────────────────────
+consultor --> mobile : usa o app
+admin --> mobile : usa o app
+
+mobile --> ratelimit : HTTPS / REST+JSON\n(Bearer JWT)
+fakeapi <.. mobile : modo mock (dev)
+
+ratelimit --> secfilter : passa se não\nbloqueado (429)
+secfilter --> authctrl
+secfilter --> clientectrl
+secfilter --> missaoctrl
+secfilter --> interacaoctrl
+secfilter --> mlctrl
+secfilter --> mlbatchctrl
+secfilter --> healthctrl : público (sem auth)
+
+authctrl --> mlservice
+clientectrl --> services
+missaoctrl --> services
+interacaoctrl --> services
+
+mlctrl --> mlservice
+mlbatchctrl --> pipeline
+
+mlservice --> mlpredict : REST (service token\nX-Service-Token)
+mlservice --> mlbatch
+pipeline --> mlbatch : batch semanal\n(cron: domingo 23h)
+pipeline --> pg : feature snapshots\n(cron: a cada 30 min)
+
+services --> pg : JPA / JDBC\n(Flyway migrations)
+secfilter --> supabase_auth : valida JWKS\n(RS256)
+authctrl --> pg : API Clients\n(BCrypt hash)
+
+exhandler ..> authctrl : intercepta exceções
+exhandler ..> services : intercepta exceções
+
+ci --> docker : build image
+docker --> ghcr : push
+ghcr --> render : deploy
+render --> pg : conecta via\nSPRING_DATASOURCE_URL
+
+@enduml

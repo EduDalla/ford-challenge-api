@@ -1,0 +1,123 @@
+@startuml diagrama_camadas_bff
+!theme plain
+skinparam backgroundColor #F8F9FA
+skinparam defaultFontName "Segoe UI"
+skinparam defaultFontSize 13
+skinparam ArrowColor #374151
+skinparam linetype ortho
+skinparam padding 10
+skinparam nodesep 30
+skinparam ranksep 40
+
+skinparam rectangle {
+    RoundCorner 12
+}
+
+title **BFF Pulso de Retenção — Arquitetura em Camadas**\n<size:11>(Spring Boot 4 / Java 17 — organização por responsabilidade)</size>
+
+' ═══════════════════════════════════════
+' CAMADA 0 — CLIENTE EXTERNO
+' ═══════════════════════════════════════
+rectangle "**Clientes Externos**" as ext #EDE9FE-D8B4FE {
+    rectangle "Mobile App\n(React Native)" as mob #EDE9FE
+    rectangle "ML API\n(FastAPI)" as mlext #EDE9FE
+}
+
+' ═══════════════════════════════════════
+' CAMADA 1 — INFRAESTRUTURA (cross-cutting)
+' ═══════════════════════════════════════
+rectangle "**Camada de Infraestrutura**  [infra/]" as infra #FEF3C7-FDE68A {
+    rectangle "RateLimitFilter\n(60/min geral · 10/min auth)" as rlf #FEF3C7
+    rectangle "SecurityFilter\n(JWT HS256 + Supabase RS256\nRBAC: ADMIN · GESTOR · ANALISTA)" as sf #FEF3C7
+    rectangle "CorsConfiguration\n(origens permitidas · sem wildcard em prod)" as cors #FEF3C7
+    rectangle "GlobalExceptionHandler\n(ErrorResponse padronizado · sem stack trace)" as geh #FEF3C7
+    rectangle "OpenApiConfig\n(desabilitado em prod)" as oapi #FEF3C7
+    rectangle "RestClientConfig\n(timeout · service token ML)" as rcc #FEF3C7
+}
+
+' ═══════════════════════════════════════
+' CAMADA 2 — APRESENTAÇÃO
+' ═══════════════════════════════════════
+rectangle "**Camada de Apresentação**  [*/api/]" as presentation #DBEAFE-93C5FD {
+    rectangle "AuthController\n/api/v1/auth/service-token" as c1 #DBEAFE
+    rectangle "ClienteController\n/api/v1/clientes" as c2 #DBEAFE
+    rectangle "MissaoController\n/api/v1/missoes\n/api/v1/radar" as c3 #DBEAFE
+    rectangle "InteracaoController\n/api/v1/interacoes" as c4 #DBEAFE
+    rectangle "MlPredictionController\n/api/v1/ml/predict" as c5 #DBEAFE
+    rectangle "MlBatchController\n/api/v1/ml/batch" as c6 #DBEAFE
+    rectangle "HealthController\n/health · /actuator/health" as c7 #DBEAFE
+}
+
+note right of presentation
+  @Valid em todos os @RequestBody
+  Bean Validation (jakarta.validation)
+  DTOs: Request / Response separados
+end note
+
+' ═══════════════════════════════════════
+' CAMADA 3 — SERVIÇOS (negócio)
+' ═══════════════════════════════════════
+rectangle "**Camada de Serviço**  [*/service/]" as service #D1FAE5-6EE7B7 {
+    rectangle "MissaoService\nClienteService\nInteracaoService\nInformacaoService" as s1 #D1FAE5
+    rectangle "MlPredictionService\nMlBatchPredictionService\nApiClientService" as s2 #D1FAE5
+    rectangle "ProcessarPredicoesMlService\nRefreshFeatureSnapshotsService\nJobExecutionLogService" as s3 #D1FAE5
+    rectangle "TokenService\nAuthenticationRateLimiter\n(5 falhas / 10 min por IP)" as s4 #D1FAE5
+}
+
+' ═══════════════════════════════════════
+' CAMADA 4 — DOMÍNIO
+' ═══════════════════════════════════════
+rectangle "**Camada de Domínio**  [*/domain/]" as domain #FCE7F3-F9A8D4 {
+    rectangle "Cliente · NivelRisco\nMissao · MissaoAcao\nMissaoResultado · Veiculo\nStatusMissao · PrioridadeRadar" as d1 #FCE7F3
+    rectangle "Interacao · TipoInteracao\nInformacao · InformacaoUser\nApiClient · Permission" as d2 #FCE7F3
+    rectangle "VinShareFeatureSnapshot\nPredicaoResultado\nJobExecutionLogEntity\nMlFeatureRefreshQueue" as d3 #FCE7F3
+}
+
+' ═══════════════════════════════════════
+' CAMADA 5 — REPOSITÓRIO (acesso a dados)
+' ═══════════════════════════════════════
+rectangle "**Camada de Repositório**  [*/repository/]" as repository #F3F4F6-D1D5DB {
+    rectangle "ClienteRepository\nMissaoRepository\nVeiculoRepository\nMissaoAcaoRepository" as r1 #F3F4F6
+    rectangle "InteracaoRepository\nInformacaoRepository\nApiClientRepository\nPermissionRepository" as r2 #F3F4F6
+    rectangle "VinShareFeatureSnapshotRepository\nPredicaoResultadoRepository\nJobExecutionLogRepository\nMlFeatureRefreshQueueRepository" as r3 #F3F4F6
+    rectangle "Specifications\n(filtros dinâmicos via JPA Criteria)" as r4 #F3F4F6
+}
+
+' ═══════════════════════════════════════
+' CAMADA 6 — BANCO DE DADOS
+' ═══════════════════════════════════════
+rectangle "**Persistência**" as persistence #E0F2FE-7DD3FC {
+    database "PostgreSQL 16\n(Supabase)\n8 migrations Flyway\nRLS · AES-256 em repouso" as pg #E0F2FE
+    database "H2 (in-memory)\n9 migrations\nTestes automatizados" as h2 #E0F2FE
+}
+
+' ═══════════════════════════════════════
+' SERVIÇOS EXTERNOS
+' ═══════════════════════════════════════
+rectangle "**Serviços Externos**" as external #FFF7ED-FED7AA {
+    rectangle "FastAPI ML API\n(ford-vinguard-api)\nPredicão + Batch" as fml #FFF7ED
+    rectangle "Supabase Auth\n(JWKS endpoint)\nValidação RS256" as supa #FFF7ED
+}
+
+' ═══════════════════════════════════════
+' SETAS DE FLUXO
+' ═══════════════════════════════════════
+mob --> rlf : HTTPS
+mlext --> rlf : service token
+
+rlf --> sf
+sf --> presentation
+cors ..> presentation : headers CORS
+
+presentation --> service : chama serviços
+service --> domain : instancia / manipula entidades
+service --> repository : CRUD
+service --> fml : REST (ML predictions)
+service --> supa : valida JWKS
+
+repository --> pg : prod (JPA + Flyway)
+repository ..> h2 : test
+
+geh ..> presentation : captura exceções não tratadas
+
+@enduml
