@@ -2,6 +2,16 @@
 
 Backend Java/Spring Boot usado como BFF da solucao Pulso Retencao para apoiar consultores na identificacao, priorizacao e recuperacao de clientes com risco de evasao no pos-venda Ford.
 
+## Time
+
+| Nome | RM |
+| --- | --- |
+| Abner Barbosa | 558468 |
+| Eduardo Dallabella | 556803 |
+| Fernando Luiz | 555201 |
+| Heloísa Real | 554535 |
+| Thomas de Almeida | 554812 |
+
 A API integra o app/mobile ou Swagger com servicos internos, Supabase Auth/PostgreSQL e a FastAPI de Machine Learning. O README esta organizado conforme os criterios de avaliacao da disciplina e tambem funciona como contrato tecnico dos endpoints REST.
 
 ## Sumario
