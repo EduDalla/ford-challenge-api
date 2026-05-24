@@ -292,6 +292,8 @@ revoke all on function ml.refresh_feature_snapshot(varchar, date) from public;
 revoke all on function ml.refresh_feature_snapshot(varchar, date) from anon;
 revoke all on function ml.refresh_feature_snapshot(varchar, date) from authenticated;
 
+drop function if exists ml.refresh_pending_features(date, integer);
+
 create or replace function ml.refresh_pending_features(
     p_data_corte date,
     p_batch_size integer default 100
