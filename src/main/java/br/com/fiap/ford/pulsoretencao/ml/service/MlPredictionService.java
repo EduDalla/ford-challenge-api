@@ -31,11 +31,11 @@ public class MlPredictionService {
 		this.serviceToken = serviceToken;
 	}
 
-	public MlBffPredictResponse predict(MlPredictRequest request, String tokenOverride) {
+	public MlBffPredictResponse predict(MlPredictRequest request) {
 		try {
 			MlPredictResponse ml = fordMlRestClient.post()
 					.uri("/predict")
-					.headers(headers -> applyMlAuth(headers, tokenOverride))
+					.headers(this::applyMlAuth)
 					.body(request)
 					.retrieve()
 					.body(MlPredictResponse.class);
@@ -56,11 +56,11 @@ public class MlPredictionService {
 		}
 	}
 
-	public MlBatchPredictResponse predictBatch(MlBatchPredictRequest request, String tokenOverride) {
+	public MlBatchPredictResponse predictBatch(MlBatchPredictRequest request) {
 		try {
 			MlBatchPredictResponse response = fordMlRestClient.post()
 					.uri("/predict-batch")
-					.headers(headers -> applyMlAuth(headers, tokenOverride))
+					.headers(this::applyMlAuth)
 					.body(request)
 					.retrieve()
 					.body(MlBatchPredictResponse.class);
@@ -83,17 +83,12 @@ public class MlPredictionService {
 		}
 	}
 
-	private void applyMlAuth(HttpHeaders headers, String tokenOverride) {
-		if (StringUtils.hasText(tokenOverride)) {
-			headers.setBearerAuth(tokenOverride.trim());
-			return;
-		}
+	private void applyMlAuth(HttpHeaders headers) {
 		if (StringUtils.hasText(serviceToken)) {
 			headers.set("X-ML-Service-Token", serviceToken.trim());
 			return;
 		}
-		throw new BadRequestException(
-				"Token ML ausente. Configure FORD_ML_SERVICE_TOKEN ou informe X-ML-Demo-Token no Swagger.");
+		throw new BadRequestException("Token ML ausente. Configure FORD_ML_SERVICE_TOKEN.");
 	}
 
 	private MlMissaoResponse toMissao(MlPredictRequest request, MlPredictResponse ml) {

@@ -109,7 +109,7 @@ public class MissaoService {
 
 		Cliente cliente = resolverCliente(request);
 		Veiculo veiculo = resolverVeiculo(request, cliente);
-		MlBffPredictResponse predicao = mlPredictionService.predict(request.predicao(), null);
+		MlBffPredictResponse predicao = mlPredictionService.predict(request.predicao());
 		MlMissaoResponse mlMissao = predicao.missao();
 
 		String codigoCartao = resolverCodigoCartao(request.codigoCartao());

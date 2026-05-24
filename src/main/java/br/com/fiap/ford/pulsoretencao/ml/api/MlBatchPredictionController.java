@@ -31,8 +31,8 @@ public class MlBatchPredictionController {
 	public ResponseEntity<MlBatchProcessResponse> processarLote(
 			@Parameter(description = "Quantidade maxima de snapshots reservados nesta chamada")
 			@RequestParam(defaultValue = "100") @Min(1) @Max(500) int limit,
-			@Parameter(description = "JWT demo opcional para teste manual no Swagger Java. Em producao, o BFF usa FORD_ML_SERVICE_TOKEN como X-ML-Service-Token.")
-			@RequestHeader(value = "X-ML-Demo-Token", required = false) String tokenOverride) {
-		return ResponseEntity.ok(mlBatchPredictionService.processarLote(limit, tokenOverride));
+			@Parameter(description = "Token de demo opcional para teste manual no Swagger Java quando DEMO_MODE=true. O BFF nao encaminha este valor para a FastAPI.")
+			@RequestHeader(value = "X-ML-Demo-Token", required = false) String demoToken) {
+		return ResponseEntity.ok(mlBatchPredictionService.processarLote(limit));
 	}
 }

@@ -189,12 +189,13 @@ on conflict do nothing;
 ## Endpoints Principais
 
 ```text
-GET  /                         health leve
-GET  /health                   health check do Render
+GET  /health                   health check publico
+GET  /actuator/health          health check publico
 GET  /v3/api-docs              OpenAPI JSON
 GET  /swagger-ui.html          Swagger UI
 POST /api/v1/auth/service-token token tecnico
 POST /api/ml/predict           BFF para FastAPI ML
+POST /api/v1/ml/predicoes/processar-lote processa fila ML em lote
 GET  /api/v1/me                usuario Supabase autenticado
 GET  /api/v1/radar/prioridades fila priorizada do Radar
 GET  /api/v1/missoes           missoes visiveis para o usuario
@@ -208,10 +209,23 @@ GET  /api/v1/indicadores/consultor indicadores do consultor logado
 GET  /api/v1/indicadores/retencao  indicadores agregados
 ```
 
-`POST /api/ml/predict` aceita:
+Por padrao, ficam publicos apenas health e Swagger/OpenAPI:
+
+```text
+/health
+/actuator/health
+/swagger-ui/**
+/swagger-ui.html
+/v3/api-docs/**
+```
+
+`/api/ml/**` e `/api/v1/ml/**` são protegidos. Eles aceitam:
 
 - service token Java com authority `SCOPE_ml:predict`; ou
-- Supabase user token cujo `public.profiles.perfil` seja `ADMIN`, `GESTOR` ou `ANALISTA`.
+- Supabase user token cujo `public.profiles.perfil` seja `ADMIN` ou `ANALISTA`; ou
+- `X-ML-Demo-Token` somente quando `DEMO_MODE=true` e o valor bater com `JAVA_ML_DEMO_TOKEN`.
+
+Com `DEMO_MODE=false`, o header de demo nao concede acesso aos endpoints ML.
 
 Os endpoints `/api/v1/missoes`, `/api/v1/cartoes`, `/api/v1/radar` e
 `/api/v1/indicadores` exigem token Supabase humano. `ANALISTA` ve missoes
@@ -258,6 +272,7 @@ Configure o Java com:
 ML_API_BASE_URL=https://ford-vinguard-api.onrender.com
 FORD_ML_SERVICE_TOKEN=<mesmo-service-token-configurado-na-fastapi>
 FORD_ML_TIMEOUT_MS=8000
+DEMO_MODE=false
 ```
 
 `FORD_ML_BASE_URL` tambem e aceito como nome principal; `ML_API_BASE_URL` fica
@@ -271,11 +286,18 @@ chamar a FastAPI, o BFF envia:
 X-ML-Service-Token: <valor de FORD_ML_SERVICE_TOKEN>
 ```
 
-O endpoint `POST /api/ml/predict` e o processamento batch tambem aceitam
-`X-ML-Demo-Token` como override opcional para teste manual no Swagger Java. Se
-esse header for informado, o Java envia o valor para a FastAPI como
-`Authorization: Bearer <jwt_demo>`. Esse caminho e somente para demo direta e o
-JWT demo continua expirando em 60 minutos pela configuracao da FastAPI.
+O header `X-ML-Demo-Token` é opcional e serve apenas para teste manual no
+Swagger Java quando `DEMO_MODE=true`. Ele libera a chamada ao BFF se o valor
+bater com `JAVA_ML_DEMO_TOKEN`, mas o Java continua chamando a FastAPI com
+`X-ML-Service-Token` quando `FORD_ML_SERVICE_TOKEN` esta configurado.
+`FORD_ML_SERVICE_TOKEN` e obrigatorio para qualquer chamada Java -> FastAPI ML.
+
+Use este modo apenas em demo local/controlada:
+
+```env
+DEMO_MODE=true
+JAVA_ML_DEMO_TOKEN=<token-curto-somente-para-swagger-java>
+```
 
 Fluxo esperado:
 
@@ -291,7 +313,6 @@ Exemplo:
 curl -X POST https://ford-challenge-api.onrender.com/api/ml/predict \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer <supabase_access_token_ou_service_token_java>" \
-  -H "X-ML-Demo-Token: <token_fastapi_opcional>" \
   -d '{
     "features": {
       "ano_modelo": 2020,
@@ -337,16 +358,20 @@ SUPABASE_JWT_AUDIENCE=authenticated
 JWT_SECRET=segredo_interno_para_service_tokens
 ML_API_BASE_URL=https://ford-vinguard-api.onrender.com
 FORD_ML_SERVICE_TOKEN=<mesmo-service-token-configurado-na-fastapi>
-CORS_ALLOWED_ORIGINS=*
+CORS_ALLOWED_ORIGINS=https://<origem-do-app>
+DEMO_MODE=false
 ```
 
 Nao commite `.env`, connection string real, senha Supabase, JWT secret ou tokens.
 
-Para Expo Web local, use uma origem explicita em producao quando possivel:
+Para Expo Web local, use uma origem explicita:
 
 ```env
 CORS_ALLOWED_ORIGINS=http://localhost:8081
 ```
+
+No profile `prod`, o backend falha ao subir se `CORS_ALLOWED_ORIGINS` contiver
+wildcard (`*`).
 
 ## Roteiro Rapido De Demo
 

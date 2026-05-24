@@ -35,7 +35,11 @@ public class SecurityFilter extends OncePerRequestFilter {
         }
 
         String path = request.getServletPath();
-        return path.equals("/") || path.equals("/health") || path.equals("/healthCheck");
+        return path.equals("/health")
+                || path.equals("/actuator/health")
+                || path.equals("/swagger-ui.html")
+                || path.startsWith("/swagger-ui/")
+                || path.startsWith("/v3/api-docs/");
     }
 
     @Override

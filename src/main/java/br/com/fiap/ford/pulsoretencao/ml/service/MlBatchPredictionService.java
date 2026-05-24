@@ -59,7 +59,7 @@ public class MlBatchPredictionService {
 		this.modeloVersao = modeloVersao;
 	}
 
-	public MlBatchProcessResponse processarLote(int limit, String tokenOverride) {
+	public MlBatchProcessResponse processarLote(int limit) {
 		List<QueueItem> reservados = reservar(limit);
 		if (reservados.isEmpty()) {
 			return new MlBatchProcessResponse(0, 0, 0, "empty", "Nenhum snapshot pronto para predicao.");
@@ -67,7 +67,7 @@ public class MlBatchPredictionService {
 
 		try {
 			MlBatchPredictRequest request = montarRequest(reservados);
-			MlBatchPredictResponse response = mlPredictionService.predictBatch(request, tokenOverride);
+			MlBatchPredictResponse response = mlPredictionService.predictBatch(request);
 			Map<String, MlPredictResponse> respostas = indexarPorReferencia(response.items());
 			salvarResultados(reservados, respostas);
 
