@@ -8,6 +8,7 @@ import br.com.fiap.ford.pulsoretencao.ml.api.MlPredictRequest;
 import br.com.fiap.ford.pulsoretencao.ml.api.MlPredictResponse;
 import br.com.fiap.ford.pulsoretencao.shared.exception.BadRequestException;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.ResourceAccessException;
@@ -31,12 +32,10 @@ public class MlPredictionService {
 	}
 
 	public MlBffPredictResponse predict(MlPredictRequest request, String tokenOverride) {
-		String token = resolveToken(tokenOverride);
-
 		try {
 			MlPredictResponse ml = fordMlRestClient.post()
 					.uri("/predict")
-					.headers(headers -> headers.setBearerAuth(token))
+					.headers(headers -> applyMlAuth(headers, tokenOverride))
 					.body(request)
 					.retrieve()
 					.body(MlPredictResponse.class);
@@ -58,12 +57,10 @@ public class MlPredictionService {
 	}
 
 	public MlBatchPredictResponse predictBatch(MlBatchPredictRequest request, String tokenOverride) {
-		String token = resolveToken(tokenOverride);
-
 		try {
 			MlBatchPredictResponse response = fordMlRestClient.post()
 					.uri("/predict-batch")
-					.headers(headers -> headers.setBearerAuth(token))
+					.headers(headers -> applyMlAuth(headers, tokenOverride))
 					.body(request)
 					.retrieve()
 					.body(MlBatchPredictResponse.class);
@@ -86,12 +83,14 @@ public class MlPredictionService {
 		}
 	}
 
-	private String resolveToken(String tokenOverride) {
+	private void applyMlAuth(HttpHeaders headers, String tokenOverride) {
 		if (StringUtils.hasText(tokenOverride)) {
-			return tokenOverride.trim();
+			headers.setBearerAuth(tokenOverride.trim());
+			return;
 		}
 		if (StringUtils.hasText(serviceToken)) {
-			return serviceToken.trim();
+			headers.set("X-ML-Service-Token", serviceToken.trim());
+			return;
 		}
 		throw new BadRequestException(
 				"Token ML ausente. Configure FORD_ML_SERVICE_TOKEN ou informe X-ML-Demo-Token no Swagger.");

@@ -28,7 +28,7 @@ public class MlPredictionController {
 	@PostMapping("/predict")
 	@Operation(summary = "Gerar predicao integrada Java -> FastAPI ML")
 	public ResponseEntity<MlBffPredictResponse> predict(
-			@Parameter(description = "Token Bearer gerado pela FastAPI para demo, usado quando FORD_ML_SERVICE_TOKEN nao estiver configurado")
+			@Parameter(description = "JWT demo opcional para teste manual no Swagger Java. Em producao, o BFF usa FORD_ML_SERVICE_TOKEN como X-ML-Service-Token.")
 			@RequestHeader(value = "X-ML-Demo-Token", required = false) String tokenOverride,
 			@Valid @RequestBody MlPredictRequest request) {
 		return ResponseEntity.ok(mlPredictionService.predict(request, tokenOverride));

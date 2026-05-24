@@ -256,16 +256,34 @@ Configure o Java com:
 
 ```env
 ML_API_BASE_URL=https://ford-vinguard-api.onrender.com
-FORD_ML_SERVICE_TOKEN=TOKEN_GERADO_NA_FASTAPI
+FORD_ML_SERVICE_TOKEN=<mesmo-service-token-configurado-na-fastapi>
 FORD_ML_TIMEOUT_MS=8000
 ```
 
 `FORD_ML_BASE_URL` tambem e aceito como nome principal; `ML_API_BASE_URL` fica
 como fallback.
 
-Para demo via Swagger sem gravar o token da FastAPI no ambiente, o endpoint
-`/api/ml/predict` aceita `X-ML-Demo-Token` quando `FORD_ML_SERVICE_TOKEN` nao
-estiver configurado.
+O `FORD_ML_SERVICE_TOKEN` e um segredo fixo server-to-server. O Java nao chama
+`/auth/demo-token` automaticamente e nao depende de JWT demo expiravel. Ao
+chamar a FastAPI, o BFF envia:
+
+```http
+X-ML-Service-Token: <valor de FORD_ML_SERVICE_TOKEN>
+```
+
+O endpoint `POST /api/ml/predict` e o processamento batch tambem aceitam
+`X-ML-Demo-Token` como override opcional para teste manual no Swagger Java. Se
+esse header for informado, o Java envia o valor para a FastAPI como
+`Authorization: Bearer <jwt_demo>`. Esse caminho e somente para demo direta e o
+JWT demo continua expirando em 60 minutos pela configuracao da FastAPI.
+
+Fluxo esperado:
+
+```text
+Mobile ou Swagger Java
+-> Java BFF autenticado
+-> FastAPI ML com X-ML-Service-Token
+```
 
 Exemplo:
 
@@ -318,7 +336,7 @@ SUPABASE_JWT_ISSUER=https://PROJECT_REF.supabase.co/auth/v1
 SUPABASE_JWT_AUDIENCE=authenticated
 JWT_SECRET=segredo_interno_para_service_tokens
 ML_API_BASE_URL=https://ford-vinguard-api.onrender.com
-FORD_ML_SERVICE_TOKEN=TOKEN_GERADO_NA_FASTAPI
+FORD_ML_SERVICE_TOKEN=<mesmo-service-token-configurado-na-fastapi>
 CORS_ALLOWED_ORIGINS=*
 ```
 
