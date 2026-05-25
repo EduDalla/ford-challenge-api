@@ -91,7 +91,7 @@ public class SecurityConfigurations {
                                     new AuthorizationDecision(podeAcessarMl(authentication.get(), context.getRequest())));
                     authorize.anyRequest().authenticated();
                 })
-                .addFilterBefore(rateLimitFilter, SecurityFilter.class)
+                .addFilterBefore(rateLimitFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(securityFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();
     }
