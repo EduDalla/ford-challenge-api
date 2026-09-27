@@ -19,6 +19,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest(properties = {
@@ -171,6 +172,39 @@ class PulsoRetencaoApplicationTests {
 		mockMvc.perform(get("/api/v1/missoes/999999").with(admin))
 				.andExpect(status().isNotFound())
 				.andExpect(jsonPath("$.status").value(404));
+	}
+
+	@Test
+	void errosHttpMantemContratoEStatusEspecificos() throws Exception {
+		mockMvc.perform(get("/api/v1/clientes"))
+				.andExpect(status().isUnauthorized())
+				.andExpect(header().string("WWW-Authenticate", "Bearer"))
+				.andExpect(jsonPath("$.status").value(401))
+				.andExpect(jsonPath("$.path").value("/api/v1/clientes"));
+
+		var admin = authentication(new UsernamePasswordAuthenticationToken("admin", null,
+				java.util.List.of(new SimpleGrantedAuthority("ROLE_ADMIN"))));
+		mockMvc.perform(get("/api/v1/clientes?nivelRisco=INVALID").with(admin))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.status").value(400));
+		mockMvc.perform(post("/api/v1/clientes").with(admin)
+					.contentType(MediaType.TEXT_PLAIN).content("texto"))
+				.andExpect(status().isUnsupportedMediaType())
+				.andExpect(jsonPath("$.status").value(415));
+		mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/health"))
+				.andExpect(status().isMethodNotAllowed())
+				.andExpect(jsonPath("$.status").value(405));
+	}
+
+	@Test
+	void openApiExponeContratoDeErrosEAutenticacao() throws Exception {
+		mockMvc.perform(get("/v3/api-docs"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.components.schemas.ErrorResponse").exists())
+				.andExpect(jsonPath("$.paths['/api/v1/clientes'].get.responses['401']").exists())
+				.andExpect(jsonPath("$.paths['/api/v1/clientes'].get.responses['429']").exists())
+				.andExpect(jsonPath("$.paths['/api/v1/clientes'].get.responses['401'].headers.WWW-Authenticate").exists())
+				.andExpect(jsonPath("$.paths['/api/v1/auth/service-token'].post.security").doesNotExist());
 	}
 
 }
