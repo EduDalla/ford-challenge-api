@@ -460,11 +460,21 @@ SPRING_PROFILES_ACTIVE=dev ./mvnw spring-boot:run
 
 ### 5.4 Testes automatizados
 
-Os testes rápidos usam H2 e migrations em `src/main/resources/db/migration`; testes de integração PostgreSQL devem usar o Compose local e as migrations em `src/main/resources/db/migration-postgres`, sem depender de Supabase remoto ou FastAPI pública.
+Os testes rápidos usam H2 e migrations em `src/main/resources/db/migration`. A suíte atual valida contexto da aplicação, endpoints públicos, JWT, autorização 401/403, CRUD de clientes e soft delete:
 
 ```bash
 ./mvnw test
 ```
+
+O resultado esperado no estado atual é 13 testes aprovados, com relatório Surefire em `target/surefire-reports` e cobertura exploratória em `target/site/jacoco`.
+
+O teste PostgreSQL fica separado no profile `postgres-integration` e usa Testcontainers, sem depender de Supabase remoto ou FastAPI pública:
+
+```bash
+./mvnw -Ppostgres-integration verify
+```
+
+Além dos testes já existentes, ainda devem ser ampliados os cenários de interações, informações, missões, pipeline ML não vazio e validações completas de migrations/restrições PostgreSQL. Por isso, o status detalhado de aceite continua registrado em [TASKS.md](TASKS.md).
 
 Se o comando falhar com erro de `JAVA_HOME`, instale Java 17 e configure o ambiente antes de rodar novamente.
 
@@ -494,6 +504,16 @@ Matriz efetiva de acesso:
 Usuário humano: token Supabase assinado, `sub` deve apontar para um `profiles` ativo; o BFF deriva a role do banco. Cliente técnico: credenciais BCrypt em `private.api_clients`, token separado com `type=service`, issuer `API Ford`, audience `pulso-retencao-api` e scopes. Um cliente técnico sem `ml:predict` não acessa ML. Profile inativo e token adulterado resultam em 401; usuário autenticado sem permissão resulta em 403. Em produção `DEMO_MODE=true` é rejeitado na inicialização.
 
 Contrato de erro: `400` para JSON, enum ou parâmetro inválido; `401` para Bearer ausente/inválido, com `WWW-Authenticate: Bearer`; `403` para role/scope insuficiente; `404` para recurso inexistente; `405` para método não suportado; `415` para mídia não suportada; `429` para limite, com `Retry-After`; `500` para falha inesperada. Todos usam `ErrorResponse` e não expõem corpo ou stack trace de serviços externos.
+
+Status de atendimento da Sprint 3:
+
+| Bloco | Situação atual | Observação |
+| --- | --- | --- |
+| Maturidade REST nível 2 | Parcial | O código separa erros de entrada, autenticação, autorização, recursos inexistentes, método/mídia inválidos, limite e falhas ML; faltam testes HTTP específicos para todas as classes de falha. |
+| Testes automatizados | Parcial | Há 13 testes H2, testes de JWT/autorização/CRUD, CI com Surefire/JaCoCo e teste PostgreSQL preparado; ainda faltam cenários completos de interações, informações, missões e pipeline ML não vazio. |
+| Documentação e tratamento de erros | Parcial | README, diagrama, matriz de acesso, `ErrorResponse` e componentes OpenAPI foram atualizados; ainda falta concluir a validação automatizada do contrato OpenAPI e de todos os status de erro. |
+
+Não se considera um bloco concluído apenas porque a implementação básica existe: o aceite também exige os testes correspondentes. O checklist oficial e as evidências de cada item ficam em [TASKS.md](TASKS.md).
 
 ### 6.2 Cadastros e operacao de retencao
 

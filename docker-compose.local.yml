@@ -1,0 +1,57 @@
+name: pulso-retencao-local
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: pulso_local
+      POSTGRES_USER: pulso_local
+      POSTGRES_PASSWORD: pulso-local-only
+      TZ: America/Sao_Paulo
+    ports:
+      - "127.0.0.1:${LOCAL_DB_PORT:-5434}:5432"
+    volumes:
+      - local-postgres-data:/var/lib/postgresql/data
+      - ./docker/local/init.sql:/docker-entrypoint-initdb.d/00-local.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U pulso_local -d pulso_local"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: local
+      SPRING_CONFIG_IMPORT: ""
+      PORT: "8080"
+      TZ: America/Sao_Paulo
+      DB_URL: jdbc:postgresql://postgres:5432/pulso_local
+      DB_USERNAME: pulso_local
+      DB_PASSWORD: pulso-local-only
+      SPRING_FLYWAY_LOCATIONS: classpath:db/migration-postgres,filesystem:/opt/local/migrations
+      JWT_SECRET: local-service-signing-secret-only-for-development
+      SUPABASE_JWKS_URL: ""
+      SUPABASE_JWT_SECRET: local-user-signing-secret-only-for-development
+      SUPABASE_JWT_ISSUER: http://pulso-local/auth
+      SUPABASE_JWT_AUDIENCE: authenticated
+      CORS_ALLOWED_ORIGINS: http://localhost:8081,http://localhost:3000,http://localhost:5173
+      DEMO_MODE: "false"
+      JAVA_ML_DEMO_TOKEN: ""
+      APP_JOBS_REFRESH_FEATURE_SNAPSHOTS_ENABLED: "false"
+      APP_JOBS_PROCESSAR_PREDICOES_ML_ENABLED: "false"
+      FORD_ML_BASE_URL: ${LOCAL_ML_BASE_URL:-http://127.0.0.1:9}
+      FORD_ML_SERVICE_TOKEN: ${LOCAL_ML_SERVICE_TOKEN:-}
+      FORD_ML_TIMEOUT_MS: "2000"
+    ports:
+      - "127.0.0.1:${LOCAL_APP_PORT:-8082}:8083"
+    volumes:
+      - ./docker/local/migrations:/opt/local/migrations:ro
+
+volumes:
+  local-postgres-data:
