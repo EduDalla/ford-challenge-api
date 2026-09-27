@@ -12,8 +12,8 @@ RUN mvn -B package \
 FROM eclipse-temurin:17-jre-jammy
 WORKDIR /app
 
-ENV PORT=8080
-EXPOSE 8080
+ENV PORT=8083
+EXPOSE 8083
 
 RUN groupadd --system app && useradd --system --gid app --home-dir /app app
 

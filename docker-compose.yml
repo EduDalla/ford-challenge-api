@@ -26,7 +26,7 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      PORT: ${APP_PORT:-8080}
+      PORT: ${APP_PORT:-8083}
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
       DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-pulso_retencao}
       DB_USERNAME: ${POSTGRES_USER:-postgres}
@@ -52,7 +52,7 @@ services:
       APP_JOBS_PROCESSAR_PREDICOES_ML_MAX_ATTEMPTS: ${APP_JOBS_PROCESSAR_PREDICOES_ML_MAX_ATTEMPTS:-3}
       APP_JOBS_PROCESSAR_PREDICOES_ML_RETRY_DELAY_MINUTES: ${APP_JOBS_PROCESSAR_PREDICOES_ML_RETRY_DELAY_MINUTES:-60}
     ports:
-      - "${APP_PORT:-8080}:8080"
+      - "${APP_PORT:-8083}:8083"
 
 volumes:
   pulso-postgres-data:

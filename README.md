@@ -341,7 +341,7 @@ private.api_client_permissions
 - Java 17 instalado e `JAVA_HOME` configurado.
 - Docker e Docker Compose para subir PostgreSQL e aplicacao em container.
 - Maven Wrapper do projeto (`./mvnw`).
-- Porta `8080` livre para a API.
+- Porta `8083` livre para a API.
 - Porta `5433` livre para PostgreSQL local via Docker Compose.
 
 ### 5.2 Ambiente local independente (recomendado)
@@ -355,7 +355,7 @@ docker compose -f docker-compose.local.yml up -d --build
 docker compose -f docker-compose.local.yml logs -f app
 ```
 
-Aguarde a mensagem de inicialização do Spring. API: `http://localhost:8082`; Swagger: `http://localhost:8082/swagger-ui.html`; PostgreSQL: `localhost:5434`, banco/usuário `pulso_local`, senha `pulso-local-only`. É necessário Docker com Compose; Java/Maven são executados durante o build da imagem.
+Aguarde a mensagem de inicialização do Spring. API: `http://localhost:8083`; Swagger: `http://localhost:8083/swagger-ui.html`; PostgreSQL: `localhost:5434`, banco/usuário `pulso_local`, senha `pulso-local-only`. É necessário Docker com Compose; Java/Maven são executados durante o build da imagem.
 
 Esse ambiente tem projeto e volume próprios, portas publicadas apenas em loopback e credenciais públicas exclusivas de desenvolvimento. O `.env` da aplicação não é carregado no container. As migrations PostgreSQL existentes são reutilizadas; o bootstrap local prepara roles, `auth.users` e `pgcrypto` no schema `extensions`. Uma migration montada somente nesse Compose cria identidades locais ADMIN, GESTOR e ANALISTA e um cliente técnico.
 
@@ -363,15 +363,15 @@ Não é um servidor Supabase Auth: não oferece login por senha, cadastro ou ref
 
 ```bash
 TOKEN=$(python3 docker/local/token.py ADMIN)
-curl http://localhost:8082/health
-curl -H "Authorization: Bearer $TOKEN" http://localhost:8082/api/v1/me
-curl -H "Authorization: Bearer $TOKEN" http://localhost:8082/api/v1/clientes
+curl http://localhost:8083/health
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8083/api/v1/me
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8083/api/v1/clientes
 ```
 
 Troque `ADMIN` por `GESTOR` ou `ANALISTA` para testar permissões. No Swagger, cole o token em **Authorize**. O cliente técnico, restrito ao scope `ml:predict`, usa o fluxo real da API:
 
 ```bash
-curl -X POST http://localhost:8082/api/v1/auth/service-token \
+curl -X POST http://localhost:8083/api/v1/auth/service-token \
   -H 'Content-Type: application/json' \
   -d '{"clientId":"local-ml-client","clientSecret":"local-ml-secret"}'
 ```
@@ -384,7 +384,7 @@ LOCAL_ML_SERVICE_TOKEN=seu-token \
 docker compose -f docker-compose.local.yml up -d
 ```
 
-`localhost` nessa URL se refere ao container da aplicação. As portas do host podem ser alteradas com `LOCAL_APP_PORT` e `LOCAL_DB_PORT`; a porta interna da API permanece 8080.
+`localhost` nessa URL se refere ao container da aplicação. As portas do host podem ser alteradas com `LOCAL_APP_PORT` e `LOCAL_DB_PORT`; a porta interna e a porta padrão publicada da API são 8083.
 
 ```bash
 # Parar preservando dados:
@@ -416,7 +416,7 @@ POSTGRES_USER=postgres
 POSTGRES_PASSWORD=troque-esta-senha
 JWT_SECRET=troque-este-segredo
 POSTGRES_HOST_PORT=5433
-APP_PORT=8080
+APP_PORT=8083
 TZ=America/Sao_Paulo
 ```
 
@@ -429,7 +429,7 @@ docker compose up --build
 Teste o health check:
 
 ```bash
-curl http://localhost:8080/health
+curl http://localhost:8083/health
 ```
 
 Resposta esperada:
@@ -692,7 +692,7 @@ Com `DEMO_MODE=false`, o header `X-ML-Demo-Token` nao libera acesso.
 Gerar service token tecnico:
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/auth/service-token \
+curl -X POST http://localhost:8083/api/v1/auth/service-token \
   -H "Content-Type: application/json" \
   -d '{
     "clientId": "java-bff-demo",
@@ -703,14 +703,14 @@ curl -X POST http://localhost:8080/api/v1/auth/service-token \
 Consultar usuario autenticado:
 
 ```bash
-curl http://localhost:8080/api/v1/me \
+curl http://localhost:8083/api/v1/me \
   -H "Authorization: Bearer <supabase_access_token>"
 ```
 
 Chamar predicao ML pelo BFF:
 
 ```bash
-curl -X POST http://localhost:8080/api/ml/predict \
+curl -X POST http://localhost:8083/api/ml/predict \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer <supabase_access_token_ou_service_token_java>" \
   -d '{
@@ -734,14 +734,14 @@ curl -X POST http://localhost:8080/api/ml/predict \
 Processar lote ML:
 
 ```bash
-curl -X POST "http://localhost:8080/api/v1/ml/predicoes/processar-lote?limit=100" \
+curl -X POST "http://localhost:8083/api/v1/ml/predicoes/processar-lote?limit=100" \
   -H "Authorization: Bearer <supabase_access_token_ou_service_token_java>"
 ```
 
 Criar missao:
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/missoes \
+curl -X POST http://localhost:8083/api/v1/missoes \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer <supabase_access_token_admin_ou_gestor>" \
   -d '{
