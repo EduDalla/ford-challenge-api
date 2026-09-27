@@ -131,7 +131,7 @@ Execute os testes rápidos com H2:
 ./mvnw test
 ```
 
-A suíte atual executa 13 testes, incluindo contexto da aplicação, endpoints públicos, JWT, autorização, CRUD de clientes e soft delete. Os relatórios ficam em:
+A suíte atual executa 23 testes, incluindo contexto da aplicação, endpoints públicos, JWT, autorização, CRUD de clientes e soft delete, fluxos de informações/interações/missões e o pipeline ML. Os relatórios ficam em:
 
 - `target/surefire-reports`;
 - `target/site/jacoco`.

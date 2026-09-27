@@ -10,6 +10,11 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import org.springframework.test.web.servlet.MockMvc;
+import br.com.fiap.ford.pulsoretencao.profile.domain.PerfilProfile;
+import br.com.fiap.ford.pulsoretencao.profile.domain.Profile;
+import java.util.UUID;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -111,6 +116,61 @@ class PulsoRetencaoApplicationTests {
 				.andExpect(status().isNoContent());
 		mockMvc.perform(get(location).with(admin))
 				.andExpect(status().isNotFound());
+	}
+
+	@Test
+	void informacaoTemCriacaoConsultaEValidacao() throws Exception {
+		var admin = authentication(new UsernamePasswordAuthenticationToken("admin", null,
+				java.util.List.of(new SimpleGrantedAuthority("ROLE_ADMIN"))));
+		String body = """
+				{"nome":"Informacao teste automatizado","descricao":"Descricao para o consultor","ativo":true}
+				""";
+
+		String location = mockMvc.perform(post("/api/v1/informacoes").with(admin)
+					.contentType(MediaType.APPLICATION_JSON).content(body))
+				.andExpect(status().isCreated())
+				.andReturn().getResponse().getHeader("Location");
+
+		mockMvc.perform(get(location).with(admin))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.nome").value("Informacao teste automatizado"));
+		mockMvc.perform(post("/api/v1/informacoes").with(admin)
+					.contentType(MediaType.APPLICATION_JSON).content("{\"nome\":\"\",\"descricao\":\"\",\"ativo\":null}"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.status").value(400));
+	}
+
+	@Test
+	void interacaoTemCriacaoEConsultaPorCliente() throws Exception {
+		var admin = authentication(new UsernamePasswordAuthenticationToken("admin", null,
+				java.util.List.of(new SimpleGrantedAuthority("ROLE_ADMIN"))));
+		String body = """
+				{"tipo":"TELEFONE","descricao":"Contato de teste","resultado":"Retorno agendado","dataInteracao":"2026-09-26T10:00:00"}
+				""";
+
+		mockMvc.perform(post("/api/v1/clientes/1/interacoes").with(admin)
+					.contentType(MediaType.APPLICATION_JSON).content(body))
+				.andExpect(status().isCreated());
+		mockMvc.perform(get("/api/v1/clientes/1/interacoes").with(admin))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.content").isArray());
+	}
+
+	@Test
+	void radarDeMissoesERecursoInexistenteTemStatusEspecifico() throws Exception {
+		Profile adminProfile = mock(Profile.class);
+		when(adminProfile.getId()).thenReturn(UUID.randomUUID());
+		when(adminProfile.getPerfil()).thenReturn(PerfilProfile.ADMIN);
+		var admin = authentication(new UsernamePasswordAuthenticationToken(
+				adminProfile, null,
+				java.util.List.of(new SimpleGrantedAuthority("ROLE_ADMIN"))));
+
+		mockMvc.perform(get("/api/v1/radar/prioridades").with(admin))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$[0].codigoCartao").value("CARD-001"));
+		mockMvc.perform(get("/api/v1/missoes/999999").with(admin))
+				.andExpect(status().isNotFound())
+				.andExpect(jsonPath("$.status").value(404));
 	}
 
 }

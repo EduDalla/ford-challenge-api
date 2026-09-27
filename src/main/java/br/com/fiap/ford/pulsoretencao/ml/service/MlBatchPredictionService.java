@@ -35,7 +35,7 @@ public class MlBatchPredictionService {
 			    s.payload_predict
 			from public.ml_feature_refresh_queue q
 			join public.vin_share_feature_snapshots s on s.id = q.snapshot_id
-			where q.status = 'ready_to_predict'
+			where q.status = 'done'
 			order by q.criado_em
 			limit ?
 			for update skip locked
@@ -46,18 +46,28 @@ public class MlBatchPredictionService {
 	private final ObjectMapper objectMapper;
 	private final MlPredictionService mlPredictionService;
 	private final String modeloVersao;
+	private final boolean postgresDatabase;
 
 	public MlBatchPredictionService(
 			JdbcTemplate jdbcTemplate,
 			TransactionTemplate transactionTemplate,
 			ObjectMapper objectMapper,
 			MlPredictionService mlPredictionService,
-			@Value("${ford.ml.model-version:churn_pos_venda_rf_calibrated}") String modeloVersao) {
+				@Value("${ford.ml.model-version:churn_pos_venda_rf_calibrated}") String modeloVersao) {
 		this.jdbcTemplate = jdbcTemplate;
 		this.transactionTemplate = transactionTemplate;
 		this.objectMapper = objectMapper;
 		this.mlPredictionService = mlPredictionService;
 		this.modeloVersao = modeloVersao;
+		this.postgresDatabase = detectPostgres(jdbcTemplate);
+	}
+
+	private boolean detectPostgres(JdbcTemplate template) {
+		try (var connection = template.getDataSource().getConnection()) {
+			return connection.getMetaData().getDatabaseProductName().toLowerCase().contains("postgres");
+		} catch (SQLException exception) {
+			return false;
+		}
 	}
 
 	public MlBatchProcessResponse processarLote(int limit) {
@@ -92,7 +102,7 @@ public class MlBatchPredictionService {
 				jdbcTemplate.batchUpdate(
 						"""
 						update public.ml_feature_refresh_queue
-						set status = 'prediction_processing',
+						set status = 'processing',
 						    erro = null,
 						    atualizado_em = current_timestamp
 						where id = ?
@@ -165,8 +175,7 @@ public class MlBatchPredictionService {
 					throw new BadRequestException("FastAPI ML nao retornou reference_id " + item.referenceId());
 				}
 
-				jdbcTemplate.update(
-						"""
+				String sql = """
 						insert into public.predicao_resultados (
 						    queue_id,
 						    snapshot_id,
@@ -183,9 +192,12 @@ public class MlBatchPredictionService {
 						    payload_resposta,
 						    executado_em
 						)
-						values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, cast(? as jsonb), current_timestamp)
-						on conflict (queue_id)
-						do update set
+						values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, %s, current_timestamp)
+						%s
+						""".formatted(postgresDatabase ? "cast(? as jsonb)" : "?",
+								postgresDatabase ? """
+										on conflict (queue_id)
+										do update set
 						    snapshot_id = excluded.snapshot_id,
 						    veiculo_id = excluded.veiculo_id,
 						    cliente_id = excluded.cliente_id,
@@ -199,7 +211,8 @@ public class MlBatchPredictionService {
 						    modelo_versao = excluded.modelo_versao,
 						    payload_resposta = excluded.payload_resposta,
 						    executado_em = current_timestamp
-						""",
+									""" : "");
+				jdbcTemplate.update(sql,
 						item.queueId(),
 						item.snapshotId(),
 						item.veiculoId(),
@@ -218,7 +231,7 @@ public class MlBatchPredictionService {
 				jdbcTemplate.update(
 						"""
 						update public.ml_feature_refresh_queue
-						set status = 'completed',
+						set status = 'done',
 						    erro = null,
 						    processado_em = current_timestamp,
 						    atualizado_em = current_timestamp
@@ -275,7 +288,7 @@ public class MlBatchPredictionService {
 			message = exception.getClass().getSimpleName();
 		}
 		String sanitized = message.replaceAll("[\\r\\n\\t]+", " ");
-		return sanitized.substring(0, Math.min(sanitized.length(), 1000));
+		return sanitized.substring(0, Math.min(sanitized.length(), 255));
 	}
 
 	private record QueueItem(
