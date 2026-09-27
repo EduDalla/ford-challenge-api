@@ -23,8 +23,8 @@ import java.net.URISyntaxException;
 import java.security.interfaces.ECPublicKey;
 import java.security.interfaces.RSAPublicKey;
 import java.time.Instant;
-import java.time.LocalDateTime;
-import java.time.ZoneOffset;
+import java.time.Clock;
+import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -34,6 +34,7 @@ public class TokenService {
     private static final String SERVICE_TOKEN_ISSUER = "API Ford";
     private static final String SERVICE_TOKEN_TYPE = "service";
     private static final String USER_TOKEN_TYPE = "user";
+    private static final Duration SERVICE_TOKEN_TTL = Duration.ofHours(2);
 
     private final String serviceSecret;
     private final String supabaseJwtSecret;
@@ -41,19 +42,22 @@ public class TokenService {
     private final String supabaseJwtIssuer;
     private final String supabaseJwtAudience;
     private final JwkProvider supabaseJwkProvider;
+    private final Clock clock;
 
     public TokenService(
             @Value("${api.security.token.secret}") String serviceSecret,
             @Value("${supabase.jwt.secret:}") String supabaseJwtSecret,
             @Value("${supabase.jwks-url:}") String supabaseJwksUrl,
             @Value("${supabase.jwt.issuer:}") String supabaseJwtIssuer,
-            @Value("${supabase.jwt.audience:authenticated}") String supabaseJwtAudience) {
+            @Value("${supabase.jwt.audience:authenticated}") String supabaseJwtAudience,
+            Clock clock) {
         this.serviceSecret = serviceSecret;
         this.supabaseJwtSecret = supabaseJwtSecret;
         this.supabaseJwksUrl = supabaseJwksUrl;
         this.supabaseJwtIssuer = supabaseJwtIssuer;
         this.supabaseJwtAudience = supabaseJwtAudience;
         this.supabaseJwkProvider = criarJwkProvider(supabaseJwksUrl);
+        this.clock = clock;
     }
 
     public DadosTokenJWT gerarTokenServico(ApiClient apiClient) {
@@ -222,7 +226,7 @@ public class TokenService {
     }
 
     private Instant dataExpiracao() {
-        return LocalDateTime.now().plusHours(2).toInstant(ZoneOffset.of("-03:00"));
+        return clock.instant().plus(SERVICE_TOKEN_TTL);
     }
 
     public static class BadCredentialsJwtException extends RuntimeException {

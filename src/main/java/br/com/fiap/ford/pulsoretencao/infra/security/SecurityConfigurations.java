@@ -51,6 +51,9 @@ public class SecurityConfigurations {
             @Value("${app.ml.demo-token:}") String mlDemoToken,
             Environment environment
     ) {
+        if (environment.acceptsProfiles(Profiles.of("prod")) && demoMode) {
+            throw new IllegalStateException("DEMO_MODE=true nao e permitido no profile prod.");
+        }
         this.demoMode = demoMode;
         this.mlDemoToken = mlDemoToken;
         this.environment = environment;
