@@ -326,7 +326,7 @@ private.api_client_permissions
 - Java 17 instalado e `JAVA_HOME` configurado.
 - Docker e Docker Compose para subir PostgreSQL e aplicacao em container.
 - Maven Wrapper do projeto (`./mvnw`).
-- Porta `8080` livre para a API.
+- Porta `8083` livre para a API.
 - Porta `5433` livre para PostgreSQL local via Docker Compose.
 
 ### 5.2 Configuracao local com Docker Compose
@@ -345,7 +345,7 @@ POSTGRES_USER=postgres
 POSTGRES_PASSWORD=troque-esta-senha
 JWT_SECRET=troque-este-segredo
 POSTGRES_HOST_PORT=5433
-APP_PORT=8080
+APP_PORT=8083
 TZ=America/Sao_Paulo
 ```
 
@@ -358,7 +358,7 @@ docker compose up --build
 Teste o health check:
 
 ```bash
-curl http://localhost:8080/health
+curl http://localhost:8083/health
 ```
 
 Resposta esperada:
@@ -367,7 +367,30 @@ Resposta esperada:
 {"status":"ok"}
 ```
 
-### 5.3 Rodar a aplicacao localmente com Maven
+### 5.3 Ambiente local independente
+
+Para executar a solução sem depender do Supabase remoto, use o Compose local:
+
+```bash
+docker compose -f docker-compose.local.yml up -d --build
+docker compose -f docker-compose.local.yml ps
+```
+
+Nesse ambiente, a API fica em `http://localhost:8083`, o Swagger em `http://localhost:8083/swagger-ui/index.html` e o PostgreSQL em `localhost:5434`.
+
+Valide a aplicação:
+
+```bash
+curl http://localhost:8083/health
+```
+
+Para encerrar os containers preservando o volume do banco:
+
+```bash
+docker compose -f docker-compose.local.yml down
+```
+
+### 5.4 Rodar a aplicacao localmente com Maven
 
 Suba apenas o PostgreSQL:
 
@@ -387,7 +410,7 @@ Se quiser informar profile explicitamente:
 SPRING_PROFILES_ACTIVE=dev ./mvnw spring-boot:run
 ```
 
-### 5.4 Testes automatizados
+### 5.5 Testes automatizados
 
 Os testes usam H2 e migrations em `src/main/resources/db/migration`.
 
@@ -584,7 +607,7 @@ Com `DEMO_MODE=false`, o header `X-ML-Demo-Token` nao libera acesso.
 Gerar service token tecnico:
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/auth/service-token \
+curl -X POST http://localhost:8083/api/v1/auth/service-token \
   -H "Content-Type: application/json" \
   -d '{
     "clientId": "java-bff-demo",
@@ -595,14 +618,14 @@ curl -X POST http://localhost:8080/api/v1/auth/service-token \
 Consultar usuario autenticado:
 
 ```bash
-curl http://localhost:8080/api/v1/me \
+curl http://localhost:8083/api/v1/me \
   -H "Authorization: Bearer <supabase_access_token>"
 ```
 
 Chamar predicao ML pelo BFF:
 
 ```bash
-curl -X POST http://localhost:8080/api/ml/predict \
+curl -X POST http://localhost:8083/api/ml/predict \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer <supabase_access_token_ou_service_token_java>" \
   -d '{
@@ -626,14 +649,14 @@ curl -X POST http://localhost:8080/api/ml/predict \
 Processar lote ML:
 
 ```bash
-curl -X POST "http://localhost:8080/api/v1/ml/predicoes/processar-lote?limit=100" \
+curl -X POST "http://localhost:8083/api/v1/ml/predicoes/processar-lote?limit=100" \
   -H "Authorization: Bearer <supabase_access_token_ou_service_token_java>"
 ```
 
 Criar missao:
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/missoes \
+curl -X POST http://localhost:8083/api/v1/missoes \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer <supabase_access_token_admin_ou_gestor>" \
   -d '{
