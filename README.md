@@ -1,8 +1,8 @@
-# Pulso Retenção API
+# Pulso Retencao API
 
-Backend Java/Spring Boot usado como BFF da solução Pulso Retenção. A aplicação integra clientes web/mobile, autenticação, PostgreSQL e o serviço externo de Machine Learning.
+Backend Java/Spring Boot usado como BFF da solucao Pulso Retencao para apoiar consultores na identificacao, priorizacao e recuperacao de clientes com risco de evasao no pos-venda Ford.
 
-## Equipe
+## Time
 
 | Nome | RM |
 | --- | --- |
@@ -12,139 +12,869 @@ Backend Java/Spring Boot usado como BFF da solução Pulso Retenção. A aplica�
 | Heloísa Real | 554535 |
 | Thomas de Almeida | 554812 |
 
-## Executar localmente
+A API integra o app/mobile ou Swagger com servicos internos, Supabase Auth/PostgreSQL e a FastAPI de Machine Learning. O README esta organizado conforme os criterios de avaliacao da disciplina e tambem funciona como contrato tecnico dos endpoints REST.
 
-Requisitos: Docker com Docker Compose e Git.
+## Rubrica da Sprint 3
 
-Suba o ambiente local independente do Supabase remoto:
+| Critério | Peso | Evidências principais |
+| --- | ---: | --- |
+| Arquitetura da solução | 20% | Diagrama editável, fluxos de autenticação e integração Java → FastAPI. |
+| Autenticação e autorização | 20% | Matriz de acesso, JWT humano, token técnico e respostas 401/403. |
+| JWT | 15% | `Clock` controlado, expiração, issuer, audience, assinatura e tipo. |
+| REST nível 2 | 20% | Status HTTP, `ErrorResponse`, CRUD e tratamento de falhas ML. |
+| Testes automatizados | 15% | Suíte H2, teste PostgreSQL separado e evidências do CI. |
+| Documentação e erros | 10% | README, OpenAPI, contrato de erros e roteiro local. |
+
+O detalhamento de aceite e o acompanhamento de conclusão ficam em [TASKS.md](TASKS.md).
+
+## Sumario
+
+- [1. Integracao por Web Services (50%)](#1-integracao-por-web-services-50)
+- [2. Arquitetura Orientada a Servicos - SOA (20%)](#2-arquitetura-orientada-a-servicos---soa-20)
+- [3. Padroes e Boas Praticas (15%)](#3-padroes-e-boas-praticas-15)
+- [4. Conexao com Banco de Dados (15%)](#4-conexao-com-banco-de-dados-15)
+- [5. Como Executar](#5-como-executar)
+- [6. Funcionalidades](#6-funcionalidades)
+- [7. Contrato dos Endpoints](#7-contrato-dos-endpoints)
+- [8. Deploy, CI/CD e Demonstracao](#8-deploy-cicd-e-demonstracao)
+
+## 1. Integracao por Web Services (50%)
+
+### 1.1 Desenho de arquitetura contendo os componentes usados (10%)
+
+```text
+Consultor / Gestor
+      |
+      v
+Mobile React Native/Expo ou Swagger UI
+      |
+      | HTTPS + JSON + Bearer JWT
+      v
+Java Spring Boot BFF - Pulso Retencao API
+      |
+      |-- Spring Security: JWT, RBAC, CORS e filtros stateless
+      |-- Controllers REST: contrato HTTP consumido pelo mobile e por integracoes
+      |-- Services: regras de negocio de clientes, missoes, interacoes e ML
+      |-- Repositories JPA/JDBC: persistencia e consultas no PostgreSQL
+      |
+      | JDBC + Flyway
+      v
+Supabase PostgreSQL
+      |
+      |-- auth.users: autenticacao humana via Supabase Auth
+      |-- public.profiles: perfil funcional usado pelo backend
+      |-- public.clientes, veiculos, missoes, interacoes, informacoes
+      |-- public.vin_share_feature_snapshots, ml_feature_refresh_queue, predicao_resultados
+      |-- private.api_clients, permissions, api_client_permissions
+      |
+      | HTTPS + X-ML-Service-Token
+      v
+FastAPI ML no Render
+      |
+      |-- /predict
+      |-- /predict-batch
+      v
+Predicao de perfil, risco, score, motivo, canal e acao recomendada
+
+CI/CD GitHub Actions
+      |
+      |-- ./mvnw test
+      |-- docker build
+      |-- Trivy scan
+      |-- push para GHCR
+      v
+Render / Container Docker
+```
+
+Responsabilidades dos componentes:
+
+| Componente | Responsabilidade |
+| --- | --- |
+| Mobile/Swagger | Cliente consumidor do contrato REST. Envia JSON e autentica por Bearer token. |
+| Spring Boot BFF | Camada de integracao, seguranca, regras de negocio e orquestracao entre sistemas. |
+| Supabase Auth | Autenticacao de usuarios humanos e emissao do JWT Supabase. |
+| Supabase PostgreSQL | Banco transacional da aplicacao, incluindo dominio de retencao, missoes, fila ML e integracoes privadas. |
+| FastAPI ML | Servico externo de IA/ML para predicao de churn, risco e acao recomendada. |
+| Flyway | Versionamento e aplicacao automatica das migrations do banco. |
+| Render/GHCR | Publicacao e execucao em container Docker. |
+
+Diagrama editável e sincronizado com as rotas atuais: [Diagrams/arquitetura-sprint-3.md](Diagrams/arquitetura-sprint-3.md). O BFF Java é um deploy único com módulos internos; Supabase Auth, PostgreSQL e FastAPI ML são serviços externos separados.
+
+### 1.2 Implementacao de APIs RESTful para comunicacao entre sistemas (20%)
+
+O projeto adota Web Services RESTful com JSON como formato de troca de dados. Os contratos sao expostos por controllers Spring MVC e documentados pelo README e pelo Swagger/OpenAPI em ambiente fora de producao.
+
+Principais integracoes REST:
+
+| Integracao | Protocolo | Formato | Autenticacao | Objetivo |
+| --- | --- | --- | --- | --- |
+| Mobile/Swagger -> Java BFF | HTTPS REST | JSON | Bearer JWT Supabase ou service token | Consumir funcionalidades de retencao, missoes, indicadores e ML. |
+| Java BFF -> FastAPI ML | HTTPS REST | JSON | `X-ML-Service-Token` | Enviar features e receber predicoes de risco/churn. |
+| Java BFF -> Supabase/PostgreSQL | JDBC | SQL | Usuario e senha do banco via env vars | Persistir clientes, missoes, interacoes, fila ML e resultados. |
+| Java BFF -> Supabase Auth/JWKS | HTTPS | JSON/JWKS | URL publica JWKS ou secret legacy | Validar tokens JWT de usuarios humanos. |
+
+O projeto nao usa SOAP, XML ou WSDL porque a arquitetura escolhida e REST + JSON + OpenAPI, padrao adequado para integracao com mobile, Swagger e servicos web modernos.
+
+### 1.3 Uso adequado de metodos HTTP (10%)
+
+| Metodo | Uso no projeto | Exemplos |
+| --- | --- | --- |
+| `GET` | Consulta de recursos sem alterar estado. | `/health`, `/api/v1/me`, `/api/v1/missoes`, `/api/v1/radar/prioridades`, `/api/v1/clientes/{id}` |
+| `POST` | Criacao de recursos ou disparo de processamento. | `/api/v1/auth/service-token`, `/api/v1/missoes`, `/api/v1/missoes/{id}/acoes`, `/api/ml/predict` |
+| `PUT` | Atualizacao completa de cadastros. | `/api/v1/clientes/{id}`, `/api/v1/informacoes/{id}`, `/api/v1/informacoes-user/{id}` |
+| `PATCH` | Atualizacao parcial de estado. | `/api/v1/missoes/{id}/status` |
+| `DELETE` | Exclusao logica ou remocao de vinculos. | `/api/v1/clientes/{id}`, `/api/v1/interacoes/{id}`, `/api/v1/informacoes-user/{id}` |
+| `OPTIONS` | Preflight CORS. | Permitido globalmente para integracao com front-end/mobile. |
+
+### 1.4 Documentacao das APIs com README e Swagger como contrato (10%)
+
+O contrato dos endpoints esta descrito na secao [7. Contrato dos Endpoints](#7-contrato-dos-endpoints). Alem disso, o projeto possui Swagger/OpenAPI via `springdoc-openapi-starter-webmvc-ui`.
+
+URLs de documentacao quando o profile nao e `prod`:
+
+```text
+GET /swagger-ui.html
+GET /swagger-ui/**
+GET /v3/api-docs
+GET /v3/api-docs/**
+```
+
+No profile `prod`, Swagger e OpenAPI ficam desabilitados por seguranca:
+
+```properties
+springdoc.swagger-ui.enabled=false
+springdoc.api-docs.enabled=false
+```
+
+## 2. Arquitetura Orientada a Servicos - SOA (20%)
+
+### 2.1 Organizacao modular baseada em servicos independentes e reutilizaveis (10%)
+
+A aplicacao e dividida por dominios de negocio e servicos reutilizaveis. Cada modulo possui responsabilidade clara e pode ser evoluido sem misturar regras de outros dominios.
+
+| Modulo | Responsabilidade |
+| --- | --- |
+| `autenticacao` | Emissao de token tecnico para clientes de integracao. |
+| `cliente` | CRUD, filtros e soft delete de clientes. |
+| `interacao` | Registro e consulta de contatos/acoes de retencao por cliente. |
+| `informacao` | Catalogo de informacoes relevantes para consultores. |
+| `informacaouser` | Vinculo de informacoes/alertas a usuarios consultores. |
+| `missao` | Radar de prioridades, missoes, cartoes de recuperacao, acoes, resultados e indicadores. |
+| `ml` | BFF REST para chamada da FastAPI ML e processamento batch. |
+| `mlpipeline` | Feature snapshots, fila de predicao, resultados ML, jobs e logs de execucao. |
+| `integracao` | Clientes tecnicos, permissoes e credenciais privadas. |
+| `profile` | Perfil funcional do usuario autenticado no Supabase. |
+| `infra.security` | JWT, RBAC, CORS, filtros e configuracao stateless. |
+| `shared.exception` | Tratamento centralizado de erros da API. |
+
+### 2.2 Separacao clara entre apresentacao, servico e dados (10%)
+
+O projeto segue separacao por camadas:
+
+| Camada | Pacotes | Papel |
+| --- | --- | --- |
+| Apresentacao/API | `*.api`, `controller` | Controllers REST, DTOs de request/response, validacoes de entrada e contrato HTTP. |
+| Servico/Negocio | `*.service` | Regras de negocio, orquestracao de processos, autorizacao funcional e chamadas externas. |
+| Dominio | `*.domain`, `*.enums` | Entidades, enums e conceitos centrais do negocio. |
+| Dados | `*.repository`, `*.persistence` | Spring Data JPA, JDBC customizado e acesso ao PostgreSQL. |
+| Infraestrutura | `infra.config`, `infra.security` | Configuracoes de OpenAPI, RestClient, Jackson, CORS e seguranca. |
+| Compartilhado | `shared.api`, `shared.exception` | Padrao de erro e excecoes reutilizaveis. |
+
+Essa separacao permite que controllers apenas recebam e respondam requisicoes, services concentrem regras de negocio e repositories isolem detalhes de persistencia.
+
+## 3. Padroes e Boas Praticas (15%)
+
+### 3.1 Adoção de padroes REST, JSON e OpenAPI (8%)
+
+Padroes aplicados no projeto:
+
+| Padrao | Aplicacao no projeto |
+| --- | --- |
+| REST | Recursos versionados em `/api/v1`, metodos HTTP semanticos e respostas HTTP padronizadas. |
+| JSON | Entrada e saida dos endpoints REST, payloads ML e respostas de erro. |
+| OpenAPI/Swagger | Contrato navegavel da API em ambiente local/dev. |
+| DTOs | Requests e responses separados das entidades de dominio. |
+| Bean Validation | Validacao declarativa com `@Valid`, `@Min`, `@Max` e constraints nos DTOs. |
+| JWT | Autenticacao stateless com Bearer token Supabase e JWT tecnico interno. |
+| RBAC | Controle de acesso por roles `ADMIN`, `GESTOR`, `ANALISTA` e scopes tecnicos. |
+| CORS | Origens configuraveis por `CORS_ALLOWED_ORIGINS`, com bloqueio de wildcard em `prod`. |
+| Soft delete | Exclusao logica em entidades como clientes e interacoes. |
+| Externalized config | Secrets, URLs e parametros de jobs configurados por variaveis de ambiente. |
+
+SOAP, XML e WSDL sao padroes validos para Web Services em outros contextos, mas este projeto usa REST + JSON + OpenAPI por ser mais direto para mobile, BFF e integracoes HTTP modernas.
+
+### 3.2 Tratamento adequado de erros e excecoes nos servicos (7%)
+
+O tratamento de erros e centralizado em `GlobalExceptionHandler`, evitando respostas inconsistentes entre controllers.
+
+Excecoes tratadas:
+
+| Excecao | HTTP | Uso |
+| --- | --- | --- |
+| `ResourceNotFoundException` | `404 Not Found` | Recurso inexistente. |
+| `BadRequestException` | `400 Bad Request` | Requisicao invalida ou regra de negocio nao atendida. |
+| `DatabaseException` | `400 Bad Request` | Falha controlada relacionada a banco. |
+| `AccessDeniedException` | `403 Forbidden` | Usuario autenticado sem permissao para o recurso. |
+| `DataIntegrityViolationException` | `400 Bad Request` | Violacao de restricao do banco. |
+| `MethodArgumentNotValidException` | `400 Bad Request` | Campos invalidos em DTOs com Bean Validation. |
+| `ConstraintViolationException` | `400 Bad Request` | Parametros invalidos em request/query. |
+| `HttpMessageNotReadableException` | `400 Bad Request` | JSON invalido ou enum/campo nao suportado. |
+| `Exception` | `500 Internal Server Error` | Erro inesperado tratado de forma padronizada. |
+
+Formato padrao de erro:
+
+```json
+{
+  "timestamp": "2026-05-24T16:00:00",
+  "status": 400,
+  "error": "Bad Request",
+  "message": "Dados invalidos na requisicao.",
+  "path": "/api/v1/clientes",
+  "fields": {
+    "nome": "nao deve estar em branco"
+  }
+}
+```
+
+## 4. Conexao com Banco de Dados (15%)
+
+### 4.1 Dependencias e configuracoes para conexao (8%)
+
+Dependencias relacionadas a banco e persistencia:
+
+| Dependencia | Papel |
+| --- | --- |
+| `spring-boot-starter-data-jpa` | Mapeamento ORM, repositories e entidades. |
+| `postgresql` | Driver JDBC para PostgreSQL/Supabase. |
+| `spring-boot-starter-flyway` | Execucao das migrations no startup. |
+| `flyway-database-postgresql` | Suporte Flyway especifico para PostgreSQL. |
+| `h2` | Banco em memoria para testes automatizados. |
+| `spring-boot-starter-data-jpa-test` | Suporte de testes para JPA. |
+| `spring-boot-starter-flyway-test` | Suporte de testes para migrations. |
+
+Profiles do projeto:
+
+| Profile | Banco | Migrations | Uso |
+| --- | --- | --- | --- |
+| default/dev | PostgreSQL local, porta padrao `5433` | `classpath:db/migration-postgres` | Desenvolvimento local e Docker Compose. |
+| `prod` | Supabase PostgreSQL | `classpath:db/migration-postgres` com baseline | Deploy Render/producao. |
+| `test` | H2 em memoria | `classpath:db/migration` | Testes automatizados. |
+
+Variaveis principais de conexao:
+
+```env
+DB_URL=jdbc:postgresql://localhost:5433/pulso_retencao
+SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5433/pulso_retencao
+DB_USERNAME=postgres
+SPRING_DATASOURCE_USERNAME=postgres
+DB_PASSWORD=postgres
+SPRING_DATASOURCE_PASSWORD=postgres
+```
+
+Outras variaveis importantes:
+
+```env
+JWT_SECRET=segredo_interno_para_service_tokens
+SUPABASE_JWKS_URL=https://PROJECT_REF.supabase.co/auth/v1/.well-known/jwks.json
+SUPABASE_JWT_ISSUER=https://PROJECT_REF.supabase.co/auth/v1
+SUPABASE_JWT_AUDIENCE=authenticated
+SUPABASE_JWT_SECRET=legacy_jwt_secret_opcional
+FORD_ML_BASE_URL=https://ford-vinguard-api.onrender.com
+ML_API_BASE_URL=https://ford-vinguard-api.onrender.com
+FORD_ML_SERVICE_TOKEN=segredo_server_to_server_ml
+CORS_ALLOWED_ORIGINS=http://localhost:8081
+DEMO_MODE=false
+JAVA_ML_DEMO_TOKEN=token_de_demo_opcional
+```
+
+### 4.2 Controle de migracoes (7%)
+
+O projeto usa Flyway para versionar e aplicar alteracoes do banco de dados automaticamente.
+
+Diretorios de migrations:
+
+| Diretorio | Uso |
+| --- | --- |
+| `src/main/resources/db/migration-postgres` | Migrations PostgreSQL/Supabase usadas em `dev`, default e `prod`. |
+| `src/main/resources/db/migration` | Migrations adaptadas para H2 no profile `test`. |
+
+Migrations PostgreSQL principais:
+
+| Migration | Conteudo |
+| --- | --- |
+| `V1__create_app_foundation.sql` | Schema privado, `profiles` e base da aplicacao. |
+| `V2__create_retention_domain.sql` | Clientes, interacoes, informacoes e informacoes por usuario. |
+| `V3__create_private_integrations.sql` | Clientes tecnicos, permissoes e vinculos de permissao. |
+| `V4__seed_demo_data.sql` | Dados iniciais de demonstracao e permissoes. |
+| `V5__harden_database_access.sql` | Reforco de RLS e acesso ao banco. |
+| `V6__create_mission_domain.sql` | Veiculos, missoes, acoes e resultados. |
+| `V7__create_feature_store_mock.sql` | Feature store, snapshots, fila ML e resultados de predicao. |
+| `V8__enhance_ml_pipeline.sql` | Melhorias no pipeline ML, logs de jobs, indices e status. |
+
+Schemas/tabelas relevantes:
+
+```text
+auth.users
+public.profiles
+public.clientes
+public.veiculos
+public.missoes
+public.missao_acoes
+public.missao_resultados
+public.interacoes
+public.informacoes
+public.informacoes_user
+public.vin_share_servicos
+public.vin_share_feature_snapshots
+public.ml_feature_refresh_queue
+public.predicao_resultados
+public.job_execution_logs
+private.api_clients
+private.permissions
+private.api_client_permissions
+```
+
+## 5. Como Executar
+
+### 5.1 Requisitos
+
+- Java 17 instalado e `JAVA_HOME` configurado.
+- Docker e Docker Compose para subir PostgreSQL e aplicacao em container.
+- Maven Wrapper do projeto (`./mvnw`).
+- Porta `8083` livre para a API.
+- Porta `5433` livre para PostgreSQL local via Docker Compose.
+
+### 5.2 Ambiente local independente (recomendado)
+
+As pendências da Sprint 3 e seus critérios de aceite estão em [TASKS.md](TASKS.md).
+
+Para executar sem conta Supabase, use o Compose separado (não combine com o outro arquivo):
 
 ```bash
 docker compose -f docker-compose.local.yml up -d --build
+docker compose -f docker-compose.local.yml logs -f app
 ```
 
-Serviços publicados:
+Aguarde a mensagem de inicialização do Spring. API: `http://localhost:8083`; Swagger: `http://localhost:8083/swagger-ui.html`; PostgreSQL: `localhost:5434`, banco/usuário `pulso_local`, senha `pulso-local-only`. É necessário Docker com Compose; Java/Maven são executados durante o build da imagem.
 
-| Serviço | Endereço |
-| --- | --- |
-| API | `http://localhost:8083` |
-| Health | `http://localhost:8083/health` |
-| Swagger | `http://localhost:8083/swagger-ui/index.html` |
-| PostgreSQL | `localhost:5434` |
+Esse ambiente tem projeto e volume próprios, portas publicadas apenas em loopback e credenciais públicas exclusivas de desenvolvimento. O `.env` da aplicação não é carregado no container. As migrations PostgreSQL existentes são reutilizadas; o bootstrap local prepara roles, `auth.users` e `pgcrypto` no schema `extensions`. Uma migration montada somente nesse Compose cria identidades locais ADMIN, GESTOR e ANALISTA e um cliente técnico.
 
-Verifique os containers:
+Não é um servidor Supabase Auth: não oferece login por senha, cadastro ou refresh token. Para testar os recursos protegidos, gere um JWT de fixture com Python 3 (validade de uma hora):
 
 ```bash
-docker compose -f docker-compose.local.yml ps
+TOKEN=$(python3 docker/local/token.py ADMIN)
+curl http://localhost:8083/health
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8083/api/v1/me
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8083/api/v1/clientes
+```
+
+Troque `ADMIN` por `GESTOR` ou `ANALISTA` para testar permissões. No Swagger, cole o token em **Authorize**. O cliente técnico, restrito ao scope `ml:predict`, usa o fluxo real da API:
+
+```bash
+curl -X POST http://localhost:8083/api/v1/auth/service-token \
+  -H 'Content-Type: application/json' \
+  -d '{"clientId":"local-ml-client","clientSecret":"local-ml-secret"}'
+```
+
+Os jobs e o bypass de demonstração ficam desligados. A API não chama ML remoto automaticamente. Predições e criação de missões que dependem de predição precisam de uma FastAPI acessível pelo container; não há modelo ML embutido ou simulado. Para conectar uma instância:
+
+```bash
+LOCAL_ML_BASE_URL=https://sua-fastapi.example \
+LOCAL_ML_SERVICE_TOKEN=seu-token \
+docker compose -f docker-compose.local.yml up -d
+```
+
+`localhost` nessa URL se refere ao container da aplicação. As portas do host podem ser alteradas com `LOCAL_APP_PORT` e `LOCAL_DB_PORT`; a porta interna da API permanece 8083.
+
+```bash
+# Parar preservando dados:
+docker compose -f docker-compose.local.yml down
+# Reiniciar preservando dados:
+docker compose -f docker-compose.local.yml up -d
+# Apagar SOMENTE os dados deste ambiente local e recriar do zero:
+docker compose -f docker-compose.local.yml down -v
+docker compose -f docker-compose.local.yml up -d --build
+```
+
+O bootstrap PostgreSQL roda somente em volume vazio. Não use estas credenciais, tokens ou fixtures em produção. O Compose original continua separado; o ambiente local não acessa o banco Supabase remoto.
+
+### 5.2.1 Compose original (requer preparação compatível com Supabase)
+
+O `docker-compose.yml` original não prepara `auth.users` e roles do Supabase em um PostgreSQL vazio. Para uma instalação local nova, use a seção 5.2. As instruções abaixo pressupõem banco previamente preparado com essas estruturas.
+
+Crie o arquivo `.env` a partir do exemplo:
+
+```bash
+cp .env.example .env
+```
+
+Edite os valores sensiveis:
+
+```env
+POSTGRES_DB=pulso_retencao
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=troque-esta-senha
+JWT_SECRET=troque-este-segredo
+POSTGRES_HOST_PORT=5433
+APP_PORT=8083
+TZ=America/Sao_Paulo
+```
+
+Suba banco e aplicacao:
+
+```bash
+docker compose up --build
+```
+
+Teste o health check:
+
+```bash
 curl http://localhost:8083/health
 ```
 
-O ambiente local usa o banco `pulso_local`, usuário `pulso_local` e senha `pulso-local-only`. Esses dados são exclusivos para desenvolvimento.
+Resposta esperada:
 
-Para encerrar os containers:
-
-```bash
-docker compose -f docker-compose.local.yml down
+```json
+{"status":"ok"}
 ```
 
-O volume do PostgreSQL é preservado. Para executar a aplicação diretamente com Maven, configure Java 17 e use:
+### 5.3 Rodar a aplicacao localmente com Maven
+
+Suba apenas o PostgreSQL:
+
+```bash
+docker compose up -d postgres
+```
+
+Execute a aplicacao:
 
 ```bash
 ./mvnw spring-boot:run
 ```
 
-## Arquitetura contemplada
+Se quiser informar profile explicitamente:
 
-O diagrama editável está em [Diagrams/arquitetura-sprint-3.md](Diagrams/arquitetura-sprint-3.md).
+```bash
+SPRING_PROFILES_ACTIVE=dev ./mvnw spring-boot:run
+```
 
-- Mobile/Swagger consome a API REST Java/Spring Boot.
-- O BFF concentra controllers, regras de negócio, autenticação e integração.
-- PostgreSQL armazena os dados da aplicação.
-- Supabase Auth fornece JWTs de usuários humanos quando configurado.
-- FastAPI ML é consumida pelo BFF através de HTTP e token técnico.
-- Flyway aplica as migrations do banco.
+### 5.4 Testes automatizados
 
-## Autenticação e autorização
-
-Fora do profile `prod`, health e documentação são públicos. Os demais recursos exigem autenticação.
-
-| Recurso | Acesso contemplado |
-| --- | --- |
-| `/health` e `/actuator/health` | Público |
-| Swagger/OpenAPI fora de `prod` | Público |
-| `/api/v1/auth/service-token` | Público para credenciais técnicas válidas |
-| Clientes e interações | `ADMIN` e `GESTOR`; `ANALISTA` recebe 403 |
-| Machine Learning | Usuários autorizados ou cliente técnico com scope `ml:predict` |
-
-Usuários humanos usam JWT Supabase. O `sub` do token é associado a um profile ativo e o backend transforma o perfil em role (`ADMIN`, `GESTOR` ou `ANALISTA`).
-
-Clientes técnicos usam credenciais armazenadas em `private.api_clients` e recebem tokens com:
-
-- `type=service`;
-- issuer `API Ford`;
-- audience `pulso-retencao-api`;
-- scopes de permissão, como `ml:predict`;
-- expiração de duas horas.
-
-`DEMO_MODE=true` é rejeitado no profile `prod`. Token inválido, profile inativo e assinatura adulterada resultam em 401.
-
-## Funcionalidades principais
-
-- Health check da API e do Actuator.
-- Emissão de token técnico.
-- CRUD de clientes com filtros e soft delete.
-- Registro e consulta de interações por cliente.
-- Cadastro e consulta de informações para consultores.
-- Radar de prioridades e gerenciamento de missões.
-- Registro de ações e resultados de missões.
-- Indicadores de retenção e de consultor.
-- Predição individual em `/api/ml/predict`.
-- Processamento de lote de predições em `/api/v1/ml/predicoes/processar-lote`.
-- Persistência de fila, snapshots e resultados do pipeline ML.
-- Documentação OpenAPI/Swagger fora de produção.
-
-## Contrato REST e erros
-
-Os endpoints usam JSON e recursos versionados em `/api/v1`. Os métodos utilizados incluem `GET`, `POST`, `PUT`, `PATCH`, `DELETE` e `OPTIONS`.
-
-As respostas de erro usam o formato `ErrorResponse`, com timestamp, status, erro, mensagem e caminho:
-
-- `400`: JSON, enum ou parâmetro inválido;
-- `401`: Bearer ausente ou inválido, com `WWW-Authenticate: Bearer`;
-- `403`: role ou scope insuficiente;
-- `404`: recurso inexistente;
-- `405`: método não suportado;
-- `415`: mídia não suportada;
-- `429`: limite de requisições, com `Retry-After`;
-- `500`: falha inesperada sem detalhes internos.
-
-Falhas na integração ML são separadas entre entrada inválida, timeout, indisponibilidade e resposta inválida do serviço externo, sem expor o corpo bruto da FastAPI.
-
-## Testes e CI
-
-Execute os testes rápidos com H2:
+Os testes rápidos usam H2 e migrations em `src/main/resources/db/migration`. A suíte atual valida contexto da aplicação, endpoints públicos, JWT, autorização 401/403, CRUD de clientes e soft delete:
 
 ```bash
 ./mvnw test
 ```
 
-A suíte atual executa 13 testes, incluindo contexto da aplicação, endpoints públicos, JWT, autorização, CRUD de clientes e soft delete. Os relatórios ficam em:
+O resultado esperado no estado atual é 13 testes aprovados, com relatório Surefire em `target/surefire-reports` e cobertura exploratória em `target/site/jacoco`.
 
-- `target/surefire-reports`;
-- `target/site/jacoco`.
-
-O CI em `.github/workflows/ci.yml` executa os testes em pull requests e publica os relatórios. A publicação da imagem no GHCR permanece separada no workflow de Docker.
-
-O teste PostgreSQL com Testcontainers pode ser executado com:
+O teste PostgreSQL fica separado no profile `postgres-integration` e usa Testcontainers, sem depender de Supabase remoto ou FastAPI pública:
 
 ```bash
 ./mvnw -Ppostgres-integration verify
 ```
 
-## Documentação
+Além dos testes já existentes, ainda devem ser ampliados os cenários de interações, informações, missões, pipeline ML não vazio e validações completas de migrations/restrições PostgreSQL. Por isso, o status detalhado de aceite continua registrado em [TASKS.md](TASKS.md).
 
-No ambiente local, acesse:
+Se o comando falhar com erro de `JAVA_HOME`, instale Java 17 e configure o ambiente antes de rodar novamente.
 
-- Swagger UI: `http://localhost:8083/swagger-ui/index.html`
-- OpenAPI JSON: `http://localhost:8083/v3/api-docs`
+## 6. Funcionalidades
 
-Essas rotas não exigem token fora do profile `prod`. Em produção, Swagger e OpenAPI ficam desabilitados.
+### 6.1 Autenticacao e autorizacao
+
+- Validacao de usuario humano por JWT Supabase.
+- Validacao por JWKS (`SUPABASE_JWKS_URL`) para chaves novas ECC/RSA.
+- Fallback por `SUPABASE_JWT_SECRET` para tokens legacy HS256.
+- Busca do usuario em `public.profiles` para transformar `perfil` em role Spring.
+- Roles funcionais: `ADMIN`, `GESTOR`, `ANALISTA`.
+- Emissao de service token tecnico por `/api/v1/auth/service-token`.
+- Scopes tecnicos como `ml:predict`, convertidos para `SCOPE_ml:predict`.
+
+Matriz efetiva de acesso:
+
+| Recurso | Público | ADMIN | GESTOR | ANALISTA | Cliente técnico |
+| --- | --- | --- | --- | --- | --- |
+| `/health`, `/actuator/health`, `/v3/api-docs` fora de prod | Sim | Sim | Sim | Sim | Sim |
+| `/api/v1/auth/service-token` | Sim, com credenciais técnicas | — | — | — | Emite seu próprio token |
+| Clientes e interações | Não | CRUD | CRUD | 403 | 401/403 sem role |
+| Informações | Não | CRUD | CRUD | leitura | 401/403 |
+| Missões e indicadores | Não | fila completa | fila completa | livres ou atribuídas ao próprio profile | 401/403 |
+| `/api/ml/**` | Não | permitido | permitido | permitido | somente `SCOPE_ml:predict` |
+
+Usuário humano: token Supabase assinado, `sub` deve apontar para um `profiles` ativo; o BFF deriva a role do banco. Cliente técnico: credenciais BCrypt em `private.api_clients`, token separado com `type=service`, issuer `API Ford`, audience `pulso-retencao-api` e scopes. Um cliente técnico sem `ml:predict` não acessa ML. Profile inativo e token adulterado resultam em 401; usuário autenticado sem permissão resulta em 403. Em produção `DEMO_MODE=true` é rejeitado na inicialização.
+
+Contrato de erro: `400` para JSON, enum ou parâmetro inválido; `401` para Bearer ausente/inválido, com `WWW-Authenticate: Bearer`; `403` para role/scope insuficiente; `404` para recurso inexistente; `405` para método não suportado; `415` para mídia não suportada; `429` para limite, com `Retry-After`; `500` para falha inesperada. Todos usam `ErrorResponse` e não expõem corpo ou stack trace de serviços externos.
+
+Status de atendimento da Sprint 3:
+
+| Bloco | Situação atual | Observação |
+| --- | --- | --- |
+| Maturidade REST nível 2 | Parcial | O código separa erros de entrada, autenticação, autorização, recursos inexistentes, método/mídia inválidos, limite e falhas ML; faltam testes HTTP específicos para todas as classes de falha. |
+| Testes automatizados | Parcial | Há 13 testes H2, testes de JWT/autorização/CRUD, CI com Surefire/JaCoCo e teste PostgreSQL preparado; ainda faltam cenários completos de interações, informações, missões e pipeline ML não vazio. |
+| Documentação e tratamento de erros | Parcial | README, diagrama, matriz de acesso, `ErrorResponse` e componentes OpenAPI foram atualizados; ainda falta concluir a validação automatizada do contrato OpenAPI e de todos os status de erro. |
+
+Não se considera um bloco concluído apenas porque a implementação básica existe: o aceite também exige os testes correspondentes. O checklist oficial e as evidências de cada item ficam em [TASKS.md](TASKS.md).
+
+### 6.2 Cadastros e operacao de retencao
+
+- CRUD de clientes com filtros por termo, risco e status ativo.
+- Registro e consulta de interacoes por cliente.
+- Catalogo de informacoes relevantes para consultores.
+- Vinculo de informacoes e alertas por usuario.
+- Soft delete para preservar historico operacional.
+
+### 6.3 Radar, missoes e indicadores
+
+- Radar de prioridades para listar missoes ordenadas por risco, prioridade e score.
+- Criacao de missao a partir de dados de cliente, veiculo e predicao ML.
+- Consulta de missao por ID.
+- Abertura de missao por cartao de recuperacao (`codigoCartao`).
+- Atualizacao de status por `PATCH`.
+- Registro de acoes de contato e acompanhamento.
+- Registro de memoria/resultado da missao.
+- Indicadores por consultor e indicadores agregados de retencao.
+
+### 6.4 Integracao ML e pipeline batch
+
+- BFF Java chama FastAPI ML em `/predict` usando `X-ML-Service-Token`.
+- Endpoint `/api/ml/predict` retorna a resposta ML e uma sugestao de missao para o negocio.
+- Endpoint `/api/v1/ml/predicoes/processar-lote` reserva snapshots da fila e chama `/predict-batch`.
+- Jobs agendados renovam feature snapshots e processam predicoes pendentes.
+- Resultados ficam gravados em `public.predicao_resultados`.
+- Logs de execucao ficam em `public.job_execution_logs`.
+
+Falhas da integração ML seguem o contrato: entrada inválida é `400`; resposta inválida ou erro HTTP do upstream é `502`; timeout é `504`; indisponibilidade ou token de integração ausente é `503`. O corpo original da FastAPI nunca é devolvido ao consumidor.
+
+Configuracoes dos jobs:
+
+```env
+APP_JOBS_REFRESH_FEATURE_SNAPSHOTS_ENABLED=true
+APP_JOBS_REFRESH_FEATURE_SNAPSHOTS_CRON=0 */30 * * * *
+APP_JOBS_REFRESH_FEATURE_SNAPSHOTS_BATCH_SIZE=100
+APP_JOBS_PROCESSAR_PREDICOES_ML_ENABLED=true
+APP_JOBS_PROCESSAR_PREDICOES_ML_CRON=0 0 23 * * SUN
+APP_JOBS_PROCESSAR_PREDICOES_ML_BATCH_SIZE=100
+APP_JOBS_PROCESSAR_PREDICOES_ML_MAX_ATTEMPTS=3
+APP_JOBS_PROCESSAR_PREDICOES_ML_RETRY_DELAY_MINUTES=60
+```
+
+## 7. Contrato dos Endpoints
+
+### 7.1 Endpoints publicos
+
+| Metodo | Rota | Responsabilidade | Autenticacao | Modulo |
+| --- | --- | --- | --- | --- |
+| `GET` | `/` | Liveness simples da API. | Publica | `controller` |
+| `GET` | `/health` | Health check da aplicacao. | Publica | `controller` |
+| `GET` | `/healthCheck` | Alias de health check. | Publica | `controller` |
+| `GET` | `/actuator/health` | Health check do Spring Actuator. | Publica | Actuator |
+| `POST` | `/api/v1/auth/service-token` | Emite JWT tecnico para client de integracao. | Publica, valida credenciais no banco | `autenticacao` |
+| `GET` | `/swagger-ui.html` | Interface Swagger em ambiente nao-prod. | Publica fora de `prod` | OpenAPI |
+| `GET` | `/v3/api-docs` | Contrato OpenAPI JSON em ambiente nao-prod. | Publica fora de `prod` | OpenAPI |
+
+### 7.2 Endpoints de identidade e seguranca
+
+| Metodo | Rota | Responsabilidade | Autenticacao | Modulo |
+| --- | --- | --- | --- | --- |
+| `GET` | `/api/v1/me` | Retorna dados do usuario Supabase autenticado. | Bearer Supabase JWT | `me` |
+
+### 7.3 Endpoints de clientes
+
+| Metodo | Rota | Responsabilidade | Autenticacao | Modulo |
+| --- | --- | --- | --- | --- |
+| `POST` | `/api/v1/clientes` | Cadastra cliente. | `ADMIN` ou `GESTOR` | `cliente` |
+| `GET` | `/api/v1/clientes` | Lista clientes com filtros e paginacao. | `ADMIN` ou `GESTOR` | `cliente` |
+| `GET` | `/api/v1/clientes/{id}` | Busca cliente por ID. | `ADMIN` ou `GESTOR` | `cliente` |
+| `PUT` | `/api/v1/clientes/{id}` | Atualiza cliente. | `ADMIN` ou `GESTOR` | `cliente` |
+| `DELETE` | `/api/v1/clientes/{id}` | Exclui cliente logicamente. | `ADMIN` ou `GESTOR` | `cliente` |
+
+Filtros aceitos em `GET /api/v1/clientes`:
+
+```text
+q
+nivelRisco
+ativo
+page
+size
+sort
+```
+
+### 7.4 Endpoints de informacoes
+
+| Metodo | Rota | Responsabilidade | Autenticacao | Modulo |
+| --- | --- | --- | --- | --- |
+| `POST` | `/api/v1/informacoes` | Cadastra informacao no catalogo. | `ADMIN` ou `GESTOR` | `informacao` |
+| `GET` | `/api/v1/informacoes` | Lista informacoes. | `ADMIN`, `GESTOR` ou `ANALISTA` | `informacao` |
+| `GET` | `/api/v1/informacoes/{id}` | Busca informacao por ID. | `ADMIN`, `GESTOR` ou `ANALISTA` | `informacao` |
+| `PUT` | `/api/v1/informacoes/{id}` | Atualiza informacao. | `ADMIN` ou `GESTOR` | `informacao` |
+| `DELETE` | `/api/v1/informacoes/{id}` | Desativa informacao. | `ADMIN` ou `GESTOR` | `informacao` |
+
+### 7.5 Endpoints de informacoes por usuario
+
+| Metodo | Rota | Responsabilidade | Autenticacao | Modulo |
+| --- | --- | --- | --- | --- |
+| `POST` | `/api/v1/informacoes-user` | Cria vinculo de informacao para usuario. | `ADMIN` ou `GESTOR` | `informacaouser` |
+| `GET` | `/api/v1/informacoes-user` | Lista vinculos com filtros. | `ADMIN` ou `GESTOR` | `informacaouser` |
+| `GET` | `/api/v1/informacoes-user/{id}` | Busca vinculo por ID. | `ADMIN` ou `GESTOR` | `informacaouser` |
+| `PUT` | `/api/v1/informacoes-user/{id}` | Atualiza vinculo. | `ADMIN` ou `GESTOR` | `informacaouser` |
+| `DELETE` | `/api/v1/informacoes-user/{id}` | Exclui vinculo. | `ADMIN` ou `GESTOR` | `informacaouser` |
+
+Filtros aceitos em `GET /api/v1/informacoes-user`:
+
+```text
+userId
+informacaoId
+dataAlerta
+page
+size
+sort
+```
+
+### 7.6 Endpoints de interacoes
+
+| Metodo | Rota | Responsabilidade | Autenticacao | Modulo |
+| --- | --- | --- | --- | --- |
+| `POST` | `/api/v1/clientes/{clienteId}/interacoes` | Registra interacao de retencao para cliente. | `ADMIN` ou `GESTOR` | `interacao` |
+| `GET` | `/api/v1/clientes/{clienteId}/interacoes` | Lista interacoes de um cliente. | `ADMIN` ou `GESTOR` | `interacao` |
+| `GET` | `/api/v1/interacoes/{id}` | Busca interacao por ID. | `ADMIN` ou `GESTOR` | `interacao` |
+| `DELETE` | `/api/v1/interacoes/{id}` | Exclui interacao logicamente. | `ADMIN` ou `GESTOR` | `interacao` |
+
+Filtros aceitos em `GET /api/v1/clientes/{clienteId}/interacoes`:
+
+```text
+q
+tipo
+dataInicio
+dataFim
+page
+size
+sort
+```
+
+### 7.7 Endpoints de radar, missoes e indicadores
+
+| Metodo | Rota | Responsabilidade | Autenticacao | Modulo |
+| --- | --- | --- | --- | --- |
+| `GET` | `/api/v1/radar/prioridades` | Lista fila priorizada do Radar. | Bearer Supabase JWT | `missao` |
+| `GET` | `/api/v1/missoes` | Lista missoes visiveis para o usuario. | Bearer Supabase JWT | `missao` |
+| `POST` | `/api/v1/missoes` | Cria missao a partir de cliente, veiculo e predicao. | Bearer Supabase JWT | `missao` |
+| `GET` | `/api/v1/missoes/{id}` | Busca ficha da missao. | Bearer Supabase JWT | `missao` |
+| `GET` | `/api/v1/cartoes/{codigoCartao}` | Abre missao pelo cartao de recuperacao. | Bearer Supabase JWT | `missao` |
+| `PATCH` | `/api/v1/missoes/{id}/status` | Atualiza estado da missao. | Bearer Supabase JWT | `missao` |
+| `POST` | `/api/v1/missoes/{id}/acoes` | Registra contato/acao da missao. | Bearer Supabase JWT | `missao` |
+| `POST` | `/api/v1/missoes/{id}/resultado` | Registra memoria de resultado. | Bearer Supabase JWT | `missao` |
+| `GET` | `/api/v1/indicadores/consultor` | Retorna indicadores do consultor logado. | Bearer Supabase JWT | `missao` |
+| `GET` | `/api/v1/indicadores/retencao` | Retorna indicadores agregados. | Bearer Supabase JWT | `missao` |
+
+Regras funcionais de acesso:
+
+- `ANALISTA` visualiza missoes livres ou atribuidas a ele.
+- `GESTOR` e `ADMIN` visualizam fila e indicadores agregados.
+- Quando um analista assume uma missao, o BFF registra `responsavel_id` com o `public.profiles.id` extraido do JWT Supabase.
+
+### 7.8 Endpoints ML
+
+| Metodo | Rota | Responsabilidade | Autenticacao | Modulo |
+| --- | --- | --- | --- | --- |
+| `POST` | `/api/ml/predict` | Chama FastAPI ML `/predict` e devolve predicao + sugestao de missao. | `SCOPE_ml:predict`, `ADMIN`, `GESTOR`, `ANALISTA` ou demo token habilitado | `ml` |
+| `POST` | `/api/v1/ml/predicoes/processar-lote` | Processa fila ML em lote e salva resultados. | `SCOPE_ml:predict`, `ADMIN`, `GESTOR`, `ANALISTA` ou demo token habilitado | `ml` |
+
+`/api/ml/**` e `/api/v1/ml/**` aceitam:
+
+- service token Java com authority `SCOPE_ml:predict`;
+- Supabase user token com role `ADMIN`, `GESTOR` ou `ANALISTA`;
+- `X-ML-Demo-Token` apenas quando `DEMO_MODE=true` e o valor bate com `JAVA_ML_DEMO_TOKEN`.
+
+Com `DEMO_MODE=false`, o header `X-ML-Demo-Token` nao libera acesso.
+
+### 7.9 Exemplos de uso
+
+Gerar service token tecnico:
+
+```bash
+curl -X POST http://localhost:8083/api/v1/auth/service-token \
+  -H "Content-Type: application/json" \
+  -d '{
+    "clientId": "java-bff-demo",
+    "clientSecret": "<segredo_do_cliente>"
+  }'
+```
+
+Consultar usuario autenticado:
+
+```bash
+curl http://localhost:8083/api/v1/me \
+  -H "Authorization: Bearer <supabase_access_token>"
+```
+
+Chamar predicao ML pelo BFF:
+
+```bash
+curl -X POST http://localhost:8083/api/ml/predict \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <supabase_access_token_ou_service_token_java>" \
+  -d '{
+    "features": {
+      "ano_modelo": 2020,
+      "qtde_revisoes_ate_corte": 2,
+      "meses_desde_ultimo_servico_ate_corte": 14.2,
+      "meses_relacionamento_ate_corte": 48.0,
+      "n_dealers_usados_ate_corte": 1,
+      "km_max_ate_corte": 48200,
+      "pct_agenda_ate_corte": 0.65,
+      "intervalo_medio_revisoes_dias_ate_corte": 220.0,
+      "dias_ate_primeira_revisao": 180,
+      "idade_veiculo_meses_ate_corte": 54.0,
+      "modelo": "KA"
+    },
+    "modelo_veiculo": "Ka"
+  }'
+```
+
+Processar lote ML:
+
+```bash
+curl -X POST "http://localhost:8083/api/v1/ml/predicoes/processar-lote?limit=100" \
+  -H "Authorization: Bearer <supabase_access_token_ou_service_token_java>"
+```
+
+Criar missao:
+
+```bash
+curl -X POST http://localhost:8083/api/v1/missoes \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <supabase_access_token_admin_ou_gestor>" \
+  -d '{
+    "clienteId": 1,
+    "veiculoId": 1,
+    "prazo": "Hoje",
+    "valorPotencial": 980,
+    "impactoVinShareEstimado": 1.4,
+    "predicao": {
+      "features": {
+        "ano_modelo": 2020,
+        "qtde_revisoes_ate_corte": 2,
+        "meses_desde_ultimo_servico_ate_corte": 14.2,
+        "meses_relacionamento_ate_corte": 48.0,
+        "n_dealers_usados_ate_corte": 1,
+        "km_max_ate_corte": 48200,
+        "pct_agenda_ate_corte": 0.65,
+        "intervalo_medio_revisoes_dias_ate_corte": 220.0,
+        "dias_ate_primeira_revisao": 180,
+        "idade_veiculo_meses_ate_corte": 54.0,
+        "modelo": "KA"
+      },
+      "modelo_veiculo": "Ka"
+    }
+  }'
+```
+
+## 8. Deploy, CI/CD e Demonstracao
+
+### 8.1 Deploy no Render
+
+Servico recomendado:
+
+```text
+Name: ford-challenge-api
+Language: Docker
+Branch: main
+Dockerfile Path: Dockerfile
+Health Check Path: /health
+```
+
+Variaveis recomendadas para `prod`:
+
+```env
+SPRING_PROFILES_ACTIVE=prod
+SPRING_DATASOURCE_URL=jdbc:postgresql://HOST_POOLER:5432/postgres
+SPRING_DATASOURCE_USERNAME=postgres.xxxxx
+SPRING_DATASOURCE_PASSWORD=SENHA_SUPABASE
+SUPABASE_JWKS_URL=https://PROJECT_REF.supabase.co/auth/v1/.well-known/jwks.json
+SUPABASE_JWT_ISSUER=https://PROJECT_REF.supabase.co/auth/v1
+SUPABASE_JWT_AUDIENCE=authenticated
+JWT_SECRET=segredo_interno_para_service_tokens
+ML_API_BASE_URL=https://ford-vinguard-api.onrender.com
+FORD_ML_SERVICE_TOKEN=<mesmo-service-token-configurado-na-fastapi>
+CORS_ALLOWED_ORIGINS=https://<origem-do-app>
+DEMO_MODE=false
+```
+
+No profile `prod`:
+
+- Hibernate roda com `ddl-auto=validate`.
+- Flyway usa `classpath:db/migration-postgres`.
+- `baseline-on-migrate=true` permite trabalhar com schema Supabase existente.
+- Swagger/OpenAPI fica desabilitado.
+- `CORS_ALLOWED_ORIGINS` nao pode conter wildcard (`*`).
+
+### 8.2 CI/CD com GitHub Actions e GHCR
+
+Workflows: `.github/workflows/ci.yml` valida pull requests e publica artefatos; `.github/workflows/docker-ghcr.yml` publica imagem somente após push em `main` ou execução manual.
+
+Pipeline de PR:
+
+```text
+Checkout -> Java 17 -> ./mvnw test -> Surefire + JaCoCo como artefatos
+```
+
+Pipeline de publicação em `main` ou manualmente:
+
+```text
+Checkout do codigo
+-> setup Java 17
+-> ./mvnw -B test
+-> login no GHCR
+-> docker build
+-> Trivy scan para vulnerabilidades HIGH/CRITICAL
+-> docker push com tags SHA e latest
+```
+
+A imagem e publicada em:
+
+```text
+ghcr.io/<owner>/<repository>:<sha>
+ghcr.io/<owner>/<repository>:latest
+```
+
+### 8.3 Roteiro rapido de demonstracao alinhado a rubrica
+
+1. Apresentar o diagrama textual da arquitetura na secao 1.1.
+2. Abrir `/health` para provar disponibilidade do Web Service.
+3. Abrir `/swagger-ui.html` em ambiente nao-prod para mostrar o contrato OpenAPI.
+4. Mostrar tabelas de endpoints no README e destacar metodos HTTP corretos.
+5. Autenticar com Supabase JWT ou gerar service token tecnico.
+6. Chamar `GET /api/v1/me` para demonstrar JWT, profile e role.
+7. Chamar `GET /api/v1/radar/prioridades` para demonstrar servico de negocio.
+8. Abrir uma missao por `/api/v1/cartoes/{codigoCartao}` ou `/api/v1/missoes/{id}`.
+9. Registrar acao em `/api/v1/missoes/{id}/acoes`.
+10. Registrar resultado em `/api/v1/missoes/{id}/resultado`.
+11. Consultar `/api/v1/indicadores/consultor` e `/api/v1/indicadores/retencao`.
+12. Demonstrar `/api/ml/predict` para evidenciar integracao Java BFF -> FastAPI ML.
+13. Explicar Flyway e migrations na secao 4.2.
+14. Explicar CI/CD com testes, Docker, Trivy e GHCR na secao 8.2.
+
+Em uma execução de CI, os relatórios ficam na aba **Actions**, no resumo da execução: `surefire-reports` contém os casos executados e `jacoco-report` contém a cobertura exploratória. A publicação no GHCR não ocorre no workflow de PR.
+
+### 8.4 Checklist de avaliacao
+
+| Criterio | Evidencia no projeto |
+| --- | --- |
+| Web Services - arquitetura | Diagrama textual com Mobile/Swagger, BFF, Supabase, FastAPI ML, Flyway, Render e GHCR. |
+| Web Services - API REST | Controllers REST versionados, JSON, Swagger/OpenAPI e endpoints documentados. |
+| Web Services - metodos HTTP | Uso explicito de `GET`, `POST`, `PUT`, `PATCH`, `DELETE` e `OPTIONS`. |
+| Web Services - documentacao | README como contrato e Swagger/OpenAPI em ambiente nao-prod. |
+| SOA - modularizacao | Pacotes por dominio e services reutilizaveis. |
+| SOA - camadas | Separacao entre API/controllers, services, repositories, domain, infra e shared. |
+| Padroes - REST/JSON/OpenAPI | RESTful API, JSON, DTOs, validacao, JWT, RBAC e CORS. |
+| Padroes - erros | `GlobalExceptionHandler` e `ErrorResponse` padronizado. |
+| Banco - conexao | PostgreSQL/Supabase, H2 em testes, JPA e env vars por profile. |
+| Banco - migrations | Flyway com migrations PostgreSQL e H2 versionadas. |
+
+### 8.5 Observacoes de seguranca operacional
+
+- Nao commitar `.env`, senhas, connection strings reais, JWT secrets ou tokens.
+- `private.api_clients.client_secret_hash` deve armazenar apenas BCrypt hash.
+- `FORD_ML_SERVICE_TOKEN` deve ser igual ao segredo configurado na FastAPI ML.
+- `X-ML-Demo-Token` deve ser usado somente em demo local/controlada.
+- Em producao, manter `DEMO_MODE=false` e `CORS_ALLOWED_ORIGINS` sem wildcard.
