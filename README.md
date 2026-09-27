@@ -52,6 +52,10 @@ O volume do PostgreSQL é preservado. Para executar a aplicação diretamente co
 ./mvnw spring-boot:run
 ```
 
+## Conexão com a solução
+
+Esta API é o backend do Ford Service Pulse: o app e outros clientes consultam os clientes em risco, acompanham o radar e as missões e registram ações e resultados de retenção. O backend lê e grava esses dados no PostgreSQL e, quando uma predição é solicitada, consulta o serviço FastAPI ML. O painel de campanha e a estação física fazem parte da solução proposta no projeto; este repositório implementa a API que pode atendê-los, mas não contém esses componentes.
+
 ## Arquitetura contemplada
 
 O diagrama editável está em [Diagrams/arquitetura-sprint-3.md](Diagrams/arquitetura-sprint-3.md).
