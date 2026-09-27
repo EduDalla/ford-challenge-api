@@ -14,6 +14,19 @@ Backend Java/Spring Boot usado como BFF da solucao Pulso Retencao para apoiar co
 
 A API integra o app/mobile ou Swagger com servicos internos, Supabase Auth/PostgreSQL e a FastAPI de Machine Learning. O README esta organizado conforme os criterios de avaliacao da disciplina e tambem funciona como contrato tecnico dos endpoints REST.
 
+## Rubrica da Sprint 3
+
+| Critério | Peso | Evidências principais |
+| --- | ---: | --- |
+| Arquitetura da solução | 20% | Diagrama editável, fluxos de autenticação e integração Java → FastAPI. |
+| Autenticação e autorização | 20% | Matriz de acesso, JWT humano, token técnico e respostas 401/403. |
+| JWT | 15% | `Clock` controlado, expiração, issuer, audience, assinatura e tipo. |
+| REST nível 2 | 20% | Status HTTP, `ErrorResponse`, CRUD e tratamento de falhas ML. |
+| Testes automatizados | 15% | Suíte H2, teste PostgreSQL separado e evidências do CI. |
+| Documentação e erros | 10% | README, OpenAPI, contrato de erros e roteiro local. |
+
+O detalhamento de aceite e o acompanhamento de conclusão ficam em [TASKS.md](TASKS.md).
+
 ## Sumario
 
 - [1. Integracao por Web Services (50%)](#1-integracao-por-web-services-50)
@@ -84,6 +97,8 @@ Responsabilidades dos componentes:
 | FastAPI ML | Servico externo de IA/ML para predicao de churn, risco e acao recomendada. |
 | Flyway | Versionamento e aplicacao automatica das migrations do banco. |
 | Render/GHCR | Publicacao e execucao em container Docker. |
+
+Diagrama editável e sincronizado com as rotas atuais: [Diagrams/arquitetura-sprint-3.md](Diagrams/arquitetura-sprint-3.md). O BFF Java é um deploy único com módulos internos; Supabase Auth, PostgreSQL e FastAPI ML são serviços externos separados.
 
 ### 1.2 Implementacao de APIs RESTful para comunicacao entre sistemas (20%)
 
@@ -326,10 +341,66 @@ private.api_client_permissions
 - Java 17 instalado e `JAVA_HOME` configurado.
 - Docker e Docker Compose para subir PostgreSQL e aplicacao em container.
 - Maven Wrapper do projeto (`./mvnw`).
-- Porta `8080` livre para a API.
+- Porta `8083` livre para a API.
 - Porta `5433` livre para PostgreSQL local via Docker Compose.
 
-### 5.2 Configuracao local com Docker Compose
+### 5.2 Ambiente local independente (recomendado)
+
+As pendências da Sprint 3 e seus critérios de aceite estão em [TASKS.md](TASKS.md).
+
+Para executar sem conta Supabase, use o Compose separado (não combine com o outro arquivo):
+
+```bash
+docker compose -f docker-compose.local.yml up -d --build
+docker compose -f docker-compose.local.yml logs -f app
+```
+
+Aguarde a mensagem de inicialização do Spring. API: `http://localhost:8083`; Swagger: `http://localhost:8083/swagger-ui.html`; PostgreSQL: `localhost:5434`, banco/usuário `pulso_local`, senha `pulso-local-only`. É necessário Docker com Compose; Java/Maven são executados durante o build da imagem.
+
+Esse ambiente tem projeto e volume próprios, portas publicadas apenas em loopback e credenciais públicas exclusivas de desenvolvimento. O `.env` da aplicação não é carregado no container. As migrations PostgreSQL existentes são reutilizadas; o bootstrap local prepara roles, `auth.users` e `pgcrypto` no schema `extensions`. Uma migration montada somente nesse Compose cria identidades locais ADMIN, GESTOR e ANALISTA e um cliente técnico.
+
+Não é um servidor Supabase Auth: não oferece login por senha, cadastro ou refresh token. Para testar os recursos protegidos, gere um JWT de fixture com Python 3 (validade de uma hora):
+
+```bash
+TOKEN=$(python3 docker/local/token.py ADMIN)
+curl http://localhost:8083/health
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8083/api/v1/me
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8083/api/v1/clientes
+```
+
+Troque `ADMIN` por `GESTOR` ou `ANALISTA` para testar permissões. No Swagger, cole o token em **Authorize**. O cliente técnico, restrito ao scope `ml:predict`, usa o fluxo real da API:
+
+```bash
+curl -X POST http://localhost:8083/api/v1/auth/service-token \
+  -H 'Content-Type: application/json' \
+  -d '{"clientId":"local-ml-client","clientSecret":"local-ml-secret"}'
+```
+
+Os jobs e o bypass de demonstração ficam desligados. A API não chama ML remoto automaticamente. Predições e criação de missões que dependem de predição precisam de uma FastAPI acessível pelo container; não há modelo ML embutido ou simulado. Para conectar uma instância:
+
+```bash
+LOCAL_ML_BASE_URL=https://sua-fastapi.example \
+LOCAL_ML_SERVICE_TOKEN=seu-token \
+docker compose -f docker-compose.local.yml up -d
+```
+
+`localhost` nessa URL se refere ao container da aplicação. As portas do host podem ser alteradas com `LOCAL_APP_PORT` e `LOCAL_DB_PORT`; a porta interna da API permanece 8083.
+
+```bash
+# Parar preservando dados:
+docker compose -f docker-compose.local.yml down
+# Reiniciar preservando dados:
+docker compose -f docker-compose.local.yml up -d
+# Apagar SOMENTE os dados deste ambiente local e recriar do zero:
+docker compose -f docker-compose.local.yml down -v
+docker compose -f docker-compose.local.yml up -d --build
+```
+
+O bootstrap PostgreSQL roda somente em volume vazio. Não use estas credenciais, tokens ou fixtures em produção. O Compose original continua separado; o ambiente local não acessa o banco Supabase remoto.
+
+### 5.2.1 Compose original (requer preparação compatível com Supabase)
+
+O `docker-compose.yml` original não prepara `auth.users` e roles do Supabase em um PostgreSQL vazio. Para uma instalação local nova, use a seção 5.2. As instruções abaixo pressupõem banco previamente preparado com essas estruturas.
 
 Crie o arquivo `.env` a partir do exemplo:
 
@@ -345,7 +416,7 @@ POSTGRES_USER=postgres
 POSTGRES_PASSWORD=troque-esta-senha
 JWT_SECRET=troque-este-segredo
 POSTGRES_HOST_PORT=5433
-APP_PORT=8080
+APP_PORT=8083
 TZ=America/Sao_Paulo
 ```
 
@@ -358,7 +429,7 @@ docker compose up --build
 Teste o health check:
 
 ```bash
-curl http://localhost:8080/health
+curl http://localhost:8083/health
 ```
 
 Resposta esperada:
@@ -389,11 +460,21 @@ SPRING_PROFILES_ACTIVE=dev ./mvnw spring-boot:run
 
 ### 5.4 Testes automatizados
 
-Os testes usam H2 e migrations em `src/main/resources/db/migration`.
+Os testes rápidos usam H2 e migrations em `src/main/resources/db/migration`. A suíte atual valida contexto da aplicação, endpoints públicos, JWT, autorização 401/403, CRUD de clientes e soft delete:
 
 ```bash
 ./mvnw test
 ```
+
+O resultado esperado no estado atual é 13 testes aprovados, com relatório Surefire em `target/surefire-reports` e cobertura exploratória em `target/site/jacoco`.
+
+O teste PostgreSQL fica separado no profile `postgres-integration` e usa Testcontainers, sem depender de Supabase remoto ou FastAPI pública:
+
+```bash
+./mvnw -Ppostgres-integration verify
+```
+
+Além dos testes já existentes, ainda devem ser ampliados os cenários de interações, informações, missões, pipeline ML não vazio e validações completas de migrations/restrições PostgreSQL. Por isso, o status detalhado de aceite continua registrado em [TASKS.md](TASKS.md).
 
 Se o comando falhar com erro de `JAVA_HOME`, instale Java 17 e configure o ambiente antes de rodar novamente.
 
@@ -408,6 +489,31 @@ Se o comando falhar com erro de `JAVA_HOME`, instale Java 17 e configure o ambie
 - Roles funcionais: `ADMIN`, `GESTOR`, `ANALISTA`.
 - Emissao de service token tecnico por `/api/v1/auth/service-token`.
 - Scopes tecnicos como `ml:predict`, convertidos para `SCOPE_ml:predict`.
+
+Matriz efetiva de acesso:
+
+| Recurso | Público | ADMIN | GESTOR | ANALISTA | Cliente técnico |
+| --- | --- | --- | --- | --- | --- |
+| `/health`, `/actuator/health`, `/v3/api-docs` fora de prod | Sim | Sim | Sim | Sim | Sim |
+| `/api/v1/auth/service-token` | Sim, com credenciais técnicas | — | — | — | Emite seu próprio token |
+| Clientes e interações | Não | CRUD | CRUD | 403 | 401/403 sem role |
+| Informações | Não | CRUD | CRUD | leitura | 401/403 |
+| Missões e indicadores | Não | fila completa | fila completa | livres ou atribuídas ao próprio profile | 401/403 |
+| `/api/ml/**` | Não | permitido | permitido | permitido | somente `SCOPE_ml:predict` |
+
+Usuário humano: token Supabase assinado, `sub` deve apontar para um `profiles` ativo; o BFF deriva a role do banco. Cliente técnico: credenciais BCrypt em `private.api_clients`, token separado com `type=service`, issuer `API Ford`, audience `pulso-retencao-api` e scopes. Um cliente técnico sem `ml:predict` não acessa ML. Profile inativo e token adulterado resultam em 401; usuário autenticado sem permissão resulta em 403. Em produção `DEMO_MODE=true` é rejeitado na inicialização.
+
+Contrato de erro: `400` para JSON, enum ou parâmetro inválido; `401` para Bearer ausente/inválido, com `WWW-Authenticate: Bearer`; `403` para role/scope insuficiente; `404` para recurso inexistente; `405` para método não suportado; `415` para mídia não suportada; `429` para limite, com `Retry-After`; `500` para falha inesperada. Todos usam `ErrorResponse` e não expõem corpo ou stack trace de serviços externos.
+
+Status de atendimento da Sprint 3:
+
+| Bloco | Situação atual | Observação |
+| --- | --- | --- |
+| Maturidade REST nível 2 | Parcial | O código separa erros de entrada, autenticação, autorização, recursos inexistentes, método/mídia inválidos, limite e falhas ML; faltam testes HTTP específicos para todas as classes de falha. |
+| Testes automatizados | Parcial | Há 13 testes H2, testes de JWT/autorização/CRUD, CI com Surefire/JaCoCo e teste PostgreSQL preparado; ainda faltam cenários completos de interações, informações, missões e pipeline ML não vazio. |
+| Documentação e tratamento de erros | Parcial | README, diagrama, matriz de acesso, `ErrorResponse` e componentes OpenAPI foram atualizados; ainda falta concluir a validação automatizada do contrato OpenAPI e de todos os status de erro. |
+
+Não se considera um bloco concluído apenas porque a implementação básica existe: o aceite também exige os testes correspondentes. O checklist oficial e as evidências de cada item ficam em [TASKS.md](TASKS.md).
 
 ### 6.2 Cadastros e operacao de retencao
 
@@ -436,6 +542,8 @@ Se o comando falhar com erro de `JAVA_HOME`, instale Java 17 e configure o ambie
 - Jobs agendados renovam feature snapshots e processam predicoes pendentes.
 - Resultados ficam gravados em `public.predicao_resultados`.
 - Logs de execucao ficam em `public.job_execution_logs`.
+
+Falhas da integração ML seguem o contrato: entrada inválida é `400`; resposta inválida ou erro HTTP do upstream é `502`; timeout é `504`; indisponibilidade ou token de integração ausente é `503`. O corpo original da FastAPI nunca é devolvido ao consumidor.
 
 Configuracoes dos jobs:
 
@@ -584,7 +692,7 @@ Com `DEMO_MODE=false`, o header `X-ML-Demo-Token` nao libera acesso.
 Gerar service token tecnico:
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/auth/service-token \
+curl -X POST http://localhost:8083/api/v1/auth/service-token \
   -H "Content-Type: application/json" \
   -d '{
     "clientId": "java-bff-demo",
@@ -595,14 +703,14 @@ curl -X POST http://localhost:8080/api/v1/auth/service-token \
 Consultar usuario autenticado:
 
 ```bash
-curl http://localhost:8080/api/v1/me \
+curl http://localhost:8083/api/v1/me \
   -H "Authorization: Bearer <supabase_access_token>"
 ```
 
 Chamar predicao ML pelo BFF:
 
 ```bash
-curl -X POST http://localhost:8080/api/ml/predict \
+curl -X POST http://localhost:8083/api/ml/predict \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer <supabase_access_token_ou_service_token_java>" \
   -d '{
@@ -626,14 +734,14 @@ curl -X POST http://localhost:8080/api/ml/predict \
 Processar lote ML:
 
 ```bash
-curl -X POST "http://localhost:8080/api/v1/ml/predicoes/processar-lote?limit=100" \
+curl -X POST "http://localhost:8083/api/v1/ml/predicoes/processar-lote?limit=100" \
   -H "Authorization: Bearer <supabase_access_token_ou_service_token_java>"
 ```
 
 Criar missao:
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/missoes \
+curl -X POST http://localhost:8083/api/v1/missoes \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer <supabase_access_token_admin_ou_gestor>" \
   -d '{
@@ -702,9 +810,15 @@ No profile `prod`:
 
 ### 8.2 CI/CD com GitHub Actions e GHCR
 
-Workflow: `.github/workflows/docker-ghcr.yml`.
+Workflows: `.github/workflows/ci.yml` valida pull requests e publica artefatos; `.github/workflows/docker-ghcr.yml` publica imagem somente após push em `main` ou execução manual.
 
-Pipeline executado em push para `main` ou manualmente:
+Pipeline de PR:
+
+```text
+Checkout -> Java 17 -> ./mvnw test -> Surefire + JaCoCo como artefatos
+```
+
+Pipeline de publicação em `main` ou manualmente:
 
 ```text
 Checkout do codigo
@@ -740,6 +854,8 @@ ghcr.io/<owner>/<repository>:latest
 13. Explicar Flyway e migrations na secao 4.2.
 14. Explicar CI/CD com testes, Docker, Trivy e GHCR na secao 8.2.
 
+Em uma execução de CI, os relatórios ficam na aba **Actions**, no resumo da execução: `surefire-reports` contém os casos executados e `jacoco-report` contém a cobertura exploratória. A publicação no GHCR não ocorre no workflow de PR.
+
 ### 8.4 Checklist de avaliacao
 
 | Criterio | Evidencia no projeto |
@@ -762,3 +878,4 @@ ghcr.io/<owner>/<repository>:latest
 - `FORD_ML_SERVICE_TOKEN` deve ser igual ao segredo configurado na FastAPI ML.
 - `X-ML-Demo-Token` deve ser usado somente em demo local/controlada.
 - Em producao, manter `DEMO_MODE=false` e `CORS_ALLOWED_ORIGINS` sem wildcard.
+
