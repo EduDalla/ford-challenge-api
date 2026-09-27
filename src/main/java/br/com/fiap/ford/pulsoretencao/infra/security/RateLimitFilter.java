@@ -63,6 +63,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
         if (!isAllowed(key, limit)) {
             response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
+            response.setHeader("Retry-After", String.valueOf(Math.max(1, windowMs / 1000)));
             response.setContentType(MediaType.APPLICATION_JSON_VALUE);
             ErrorResponse error = new ErrorResponse(
                     LocalDateTime.now(),

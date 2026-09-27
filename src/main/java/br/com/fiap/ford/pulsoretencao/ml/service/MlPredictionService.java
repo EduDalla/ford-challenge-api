@@ -6,7 +6,7 @@ import br.com.fiap.ford.pulsoretencao.ml.api.MlBatchPredictResponse;
 import br.com.fiap.ford.pulsoretencao.ml.api.MlMissaoResponse;
 import br.com.fiap.ford.pulsoretencao.ml.api.MlPredictRequest;
 import br.com.fiap.ford.pulsoretencao.ml.api.MlPredictResponse;
-import br.com.fiap.ford.pulsoretencao.shared.exception.BadRequestException;
+import br.com.fiap.ford.pulsoretencao.shared.exception.ExternalServiceException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Service;
@@ -15,6 +15,7 @@ import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
+import java.net.http.HttpTimeoutException;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -41,18 +42,19 @@ public class MlPredictionService {
 					.body(MlPredictResponse.class);
 
 			if (ml == null) {
-				throw new BadRequestException("FastAPI ML retornou resposta vazia.");
+				throw new ExternalServiceException(org.springframework.http.HttpStatus.BAD_GATEWAY,
+						"O serviço ML retornou uma resposta inválida.");
 			}
 
 			return new MlBffPredictResponse(ml, toMissao(request, ml));
 		} catch (RestClientResponseException exception) {
-			throw new BadRequestException(
-					"FastAPI ML retornou " + exception.getStatusCode().value() + ": "
-							+ sanitizeBody(exception.getResponseBodyAsString()));
+			throw new ExternalServiceException(org.springframework.http.HttpStatus.BAD_GATEWAY,
+					"O serviço ML retornou uma resposta inválida.");
 		} catch (ResourceAccessException exception) {
-			throw new BadRequestException("FastAPI ML indisponivel ou timeout ao chamar /predict.");
+			throw upstreamAccessException(exception);
 		} catch (RestClientException exception) {
-			throw new BadRequestException("Falha ao chamar FastAPI ML: " + exception.getMessage());
+			throw new ExternalServiceException(org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE,
+					"Serviço ML indisponível.");
 		}
 	}
 
@@ -66,20 +68,22 @@ public class MlPredictionService {
 					.body(MlBatchPredictResponse.class);
 
 			if (response == null || response.items() == null) {
-				throw new BadRequestException("FastAPI ML retornou resposta batch vazia.");
+				throw new ExternalServiceException(org.springframework.http.HttpStatus.BAD_GATEWAY,
+						"O serviço ML retornou uma resposta batch inválida.");
 			}
 			if (response.items().size() != request.items().size()) {
-				throw new BadRequestException("FastAPI ML retornou quantidade diferente de itens no batch.");
+				throw new ExternalServiceException(org.springframework.http.HttpStatus.BAD_GATEWAY,
+						"O serviço ML retornou uma quantidade inválida de resultados.");
 			}
 			return response;
 		} catch (RestClientResponseException exception) {
-			throw new BadRequestException(
-					"FastAPI ML retornou " + exception.getStatusCode().value() + ": "
-							+ sanitizeBody(exception.getResponseBodyAsString()));
+			throw new ExternalServiceException(org.springframework.http.HttpStatus.BAD_GATEWAY,
+					"O serviço ML retornou uma resposta inválida.");
 		} catch (ResourceAccessException exception) {
-			throw new BadRequestException("FastAPI ML indisponivel ou timeout ao chamar /predict-batch.");
+			throw upstreamAccessException(exception);
 		} catch (RestClientException exception) {
-			throw new BadRequestException("Falha ao chamar FastAPI ML: " + exception.getMessage());
+			throw new ExternalServiceException(org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE,
+					"Serviço ML indisponível.");
 		}
 	}
 
@@ -88,7 +92,8 @@ public class MlPredictionService {
 			headers.set("X-ML-Service-Token", serviceToken.trim());
 			return;
 		}
-		throw new BadRequestException("Token ML ausente. Configure FORD_ML_SERVICE_TOKEN.");
+		throw new ExternalServiceException(org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE,
+				"Serviço ML não está configurado.");
 	}
 
 	private MlMissaoResponse toMissao(MlPredictRequest request, MlPredictResponse ml) {
@@ -168,10 +173,16 @@ public class MlPredictionService {
 		return "Modelo ML classificou o cliente como " + perfil + " com risco " + risco + " de abandono.";
 	}
 
-	private String sanitizeBody(String body) {
-		if (!StringUtils.hasText(body)) {
-			return "sem corpo de erro";
+	private ExternalServiceException upstreamAccessException(ResourceAccessException exception) {
+		Throwable cause = exception;
+		while (cause != null) {
+			if (cause instanceof java.net.SocketTimeoutException || cause instanceof HttpTimeoutException) {
+				return new ExternalServiceException(org.springframework.http.HttpStatus.GATEWAY_TIMEOUT,
+						"Tempo limite excedido ao chamar o serviço ML.");
+			}
+			cause = cause.getCause();
 		}
-		return body.length() > 500 ? body.substring(0, 500) : body;
+		return new ExternalServiceException(org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE,
+				"Serviço ML indisponível.");
 	}
 }

@@ -11,6 +11,11 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
+import org.springframework.web.bind.MissingPathVariableException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
@@ -33,6 +38,12 @@ public class GlobalExceptionHandler {
 	@ExceptionHandler(DatabaseException.class)
 	public ResponseEntity<ErrorResponse> handleDatabase(DatabaseException exception, HttpServletRequest request) {
 		return buildResponse(HttpStatus.BAD_REQUEST, exception.getMessage(), request, null);
+	}
+
+	@ExceptionHandler(ExternalServiceException.class)
+	public ResponseEntity<ErrorResponse> handleExternalService(ExternalServiceException exception,
+			HttpServletRequest request) {
+		return buildResponse(exception.getStatus(), exception.getMessage(), request, null);
 	}
 
 	@ExceptionHandler(AccessDeniedException.class)
@@ -65,6 +76,24 @@ public class GlobalExceptionHandler {
 	public ResponseEntity<ErrorResponse> handleUnreadableJson(HttpMessageNotReadableException exception,
 			HttpServletRequest request) {
 		return buildResponse(HttpStatus.BAD_REQUEST, "JSON inválido ou campo com valor não suportado.", request, null);
+	}
+
+	@ExceptionHandler({MethodArgumentTypeMismatchException.class, MissingServletRequestParameterException.class,
+			MissingPathVariableException.class})
+	public ResponseEntity<ErrorResponse> handleInvalidParameter(Exception exception, HttpServletRequest request) {
+		return buildResponse(HttpStatus.BAD_REQUEST, "Parâmetro inválido ou ausente.", request, null);
+	}
+
+	@ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+	public ResponseEntity<ErrorResponse> handleMethodNotSupported(HttpRequestMethodNotSupportedException exception,
+			HttpServletRequest request) {
+		return buildResponse(HttpStatus.METHOD_NOT_ALLOWED, "Método HTTP não suportado para este recurso.", request, null);
+	}
+
+	@ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+	public ResponseEntity<ErrorResponse> handleMediaTypeNotSupported(HttpMediaTypeNotSupportedException exception,
+			HttpServletRequest request) {
+		return buildResponse(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "Tipo de mídia não suportado.", request, null);
 	}
 
 	@ExceptionHandler(Exception.class)

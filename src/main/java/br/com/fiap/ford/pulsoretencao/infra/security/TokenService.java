@@ -32,6 +32,7 @@ import java.util.concurrent.TimeUnit;
 public class TokenService {
 
     private static final String SERVICE_TOKEN_ISSUER = "API Ford";
+    private static final String SERVICE_TOKEN_AUDIENCE = "pulso-retencao-api";
     private static final String SERVICE_TOKEN_TYPE = "service";
     private static final String USER_TOKEN_TYPE = "user";
     private static final Duration SERVICE_TOKEN_TTL = Duration.ofHours(2);
@@ -43,6 +44,7 @@ public class TokenService {
     private final String supabaseJwtAudience;
     private final JwkProvider supabaseJwkProvider;
     private final Clock clock;
+    private final boolean requireSupabaseIssuerAudience;
 
     public TokenService(
             @Value("${api.security.token.secret}") String serviceSecret,
@@ -50,7 +52,8 @@ public class TokenService {
             @Value("${supabase.jwks-url:}") String supabaseJwksUrl,
             @Value("${supabase.jwt.issuer:}") String supabaseJwtIssuer,
             @Value("${supabase.jwt.audience:authenticated}") String supabaseJwtAudience,
-            Clock clock) {
+            Clock clock,
+            @Value("${supabase.jwt.require-issuer-audience:false}") boolean requireSupabaseIssuerAudience) {
         this.serviceSecret = serviceSecret;
         this.supabaseJwtSecret = supabaseJwtSecret;
         this.supabaseJwksUrl = supabaseJwksUrl;
@@ -58,6 +61,10 @@ public class TokenService {
         this.supabaseJwtAudience = supabaseJwtAudience;
         this.supabaseJwkProvider = criarJwkProvider(supabaseJwksUrl);
         this.clock = clock;
+        this.requireSupabaseIssuerAudience = requireSupabaseIssuerAudience;
+        if (requireSupabaseIssuerAudience && (!hasText(supabaseJwtIssuer) || !hasText(supabaseJwtAudience))) {
+            throw new IllegalStateException("SUPABASE_JWT_ISSUER e SUPABASE_JWT_AUDIENCE sao obrigatorios em prod.");
+        }
     }
 
     public DadosTokenJWT gerarTokenServico(ApiClient apiClient) {
@@ -73,6 +80,7 @@ public class TokenService {
             var algorithm = Algorithm.HMAC256(serviceSecret);
             String token = JWT.create()
                     .withIssuer(SERVICE_TOKEN_ISSUER)
+                    .withAudience(SERVICE_TOKEN_AUDIENCE)
                     .withSubject(apiClient.getClientId())
                     .withClaim("type", SERVICE_TOKEN_TYPE)
                     .withClaim("scopes", scopes)
@@ -96,8 +104,15 @@ public class TokenService {
         try {
             DecodedJWT jwt = JWT.require(Algorithm.HMAC256(serviceSecret))
                     .withIssuer(SERVICE_TOKEN_ISSUER)
+                    .withAudience(SERVICE_TOKEN_AUDIENCE)
+                    .withClaimPresence("type")
                     .build()
                     .verify(token);
+
+            if (!hasText(jwt.getSubject()) || !SERVICE_TOKEN_TYPE.equals(jwt.getClaim("type").asString())
+                    || jwt.getExpiresAt() == null) {
+                throw new BadCredentialsJwtException("Claims obrigatorias do token de servico ausentes.", null);
+            }
 
             return new DadosTokenAutenticado(
                     jwt.getSubject(),

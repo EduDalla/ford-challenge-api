@@ -10,6 +10,8 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.http.MediaType;
 import org.springframework.web.filter.OncePerRequestFilter;
 import org.springframework.core.env.Environment;
 import org.springframework.core.env.Profiles;
@@ -25,11 +27,14 @@ public class SecurityFilter extends OncePerRequestFilter {
     private final TokenService tokenService;
     private final ProfileRepository profileRepository;
     private final Environment environment;
+    private final ObjectMapper objectMapper;
 
-    public SecurityFilter(TokenService tokenService, ProfileRepository profileRepository, Environment environment) {
+    public SecurityFilter(TokenService tokenService, ProfileRepository profileRepository, Environment environment,
+                          ObjectMapper objectMapper) {
         this.tokenService = tokenService;
         this.profileRepository = profileRepository;
         this.environment = environment;
+        this.objectMapper = objectMapper;
     }
 
     @Override
@@ -63,9 +68,14 @@ public class SecurityFilter extends OncePerRequestFilter {
                 DadosTokenAutenticado dados = tokenService.validarToken(token);
                 var authentication = criarAuthentication(dados);
                 SecurityContextHolder.getContext().setAuthentication(authentication);
-            } catch (RuntimeException exception) {
+            } catch (TokenService.BadCredentialsJwtException | IllegalArgumentException exception) {
                 SecurityContextHolder.clearContext();
                 response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                response.setHeader("WWW-Authenticate", "Bearer");
+                response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+                objectMapper.writeValue(response.getWriter(), new br.com.fiap.ford.pulsoretencao.shared.api.ErrorResponse(
+                        java.time.LocalDateTime.now(), 401, "Unauthorized",
+                        "Autenticação necessária ou token inválido.", request.getRequestURI(), null));
                 return;
             }
         }
