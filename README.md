@@ -10,7 +10,6 @@ Backend Java/Spring Boot usado como BFF da solução Pulso Retenção. A aplica�
 | Eduardo Dallabella | 556803 |
 | Fernando Luiz | 555201 |
 | Heloísa Real | 554535 |
-| Thomas de Almeida | 554812 |
 
 ## Executar localmente
 
